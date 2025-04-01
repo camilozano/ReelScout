@@ -23,9 +23,13 @@ jobs:
         python-version: ${{ matrix.python-version }}
         cache: 'poetry' # Add caching for Poetry dependencies
 
-    - name: Install Poetry
+    - name: Install poetry
+      uses: abatilo/actions-poetry@v4 # Use dedicated action
+
+    - name: Setup a local virtual environment
       run: |
-        pipx install poetry
+        poetry config virtualenvs.create true --local
+        poetry config virtualenvs.in-project true --local
 
     - name: Install dependencies
       run: |
