@@ -8,33 +8,34 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.13.2"] # Specify Python versions to test against
-
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        poetry-version: ["latest", "main", "1.8.4"]
+        os: [ubuntu-22.04, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4 # Use the latest major version
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Run image
+        uses: abatilo/actions-poetry@v3
+        with:
+          poetry-version: ${{ matrix.poetry-version }}
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5 # Use the latest major version
-      with:
-        python-version: ${{ matrix.python-version }}
-        cache: 'poetry' # Add caching for Poetry dependencies
+      - name: Setup a local virtual environment
+        run: |
+          poetry config virtualenvs.create true --local
+          poetry config virtualenvs.in-project true --local
+  
+      - name: Install dependencies
+        run: |
+          poetry install --with dev # Install main and dev dependencies
+  
+      - name: Run tests with pytest
+        run: |
+          poetry run pytest tests/ # Run tests using poetry run
 
-    - name: Install poetry
-      uses: abatilo/actions-poetry@v4 # Use dedicated action
-
-    - name: Setup a local virtual environment
-      run: |
-        poetry config virtualenvs.create true --local
-        poetry config virtualenvs.in-project true --local
-
-    - name: Install dependencies
-      run: |
-        poetry install --with dev # Install main and dev dependencies
-
-    - name: Run tests with pytest
-      run: |
-        poetry run pytest tests/ # Run tests using poetry run
