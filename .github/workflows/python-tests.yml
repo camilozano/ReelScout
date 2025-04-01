@@ -31,11 +31,6 @@ jobs:
       run: |
         poetry install --with dev # Install main and dev dependencies
 
-    - name: Create dummy auth directory and session file for tests
-      run: |
-        mkdir -p auth
-        echo "{}" > auth/session.json
-
     - name: Run tests with pytest
       run: |
         poetry run pytest tests/ # Run tests using poetry run
