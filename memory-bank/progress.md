@@ -6,7 +6,8 @@
 
 **What Works:**
 *   Memory Bank structure established and populated.
-*   Basic CLI (`reel_scout_cli.py`) using `click`.
+*   Dependency management using Poetry (`pyproject.toml`).
+*   Installable CLI (`reel-scout`) via Poetry script configuration, using `click`.
 *   Instagram login using session file (`src/instagram_client.py` with `instagrapi`).
 *   Fetching user's saved collections.
 *   Fetching media items within a selected collection.

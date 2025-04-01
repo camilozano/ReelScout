@@ -95,27 +95,27 @@ def download_collection_media(
                 download_path = client.video_download(media.pk, folder=collection_dir)
 
                 if download_path:
-                    # Calculate relative path based on the download directory provided
+                    # Extract filename from the download path
                     try:
-                        relative_path = download_path.relative_to(download_dir)
-                        relative_path_str = str(relative_path) # Update the string path
-                        item_metadata["relative_path"] = relative_path_str # Update in metadata dict
+                        # NEW LOGIC: Get only the filename
+                        filename = download_path.name
+                        filename_str = str(filename)
+                        item_metadata["relative_path"] = filename_str # Store filename in metadata
                         download_count += 1
-                    except ValueError as e:
-                        # This might happen if download_path is somehow outside download_dir
-                        # Log the error and keep relative_path_str as None
-                        logger.error(f"Could not calculate relative path for {download_path} based on {download_dir}: {e}")
-                        # Keep relative_path_str = None (already initialized)
+                    except Exception as e: # Catch broader exceptions just in case .name fails unexpectedly
+                        # Log the error and keep relative_path as None
+                        logger.error(f"Could not extract filename from path {download_path}: {e}")
+                        # Keep relative_path = None (already initialized in the outer scope)
                         error_count += 1 # Count this as an error case
-                        print(f"Error calculating relative path for {download_path}.")
-                        # Continue processing other items, but don't increment download_count here
+                        print(f"Error extracting filename for {download_path}.")
                         # The item_metadata will be added with relative_path=None
 
-                    # Only print/log success if relative path calculation succeeded
+                    # Only print/log success if filename extraction succeeded
                     if item_metadata.get("relative_path"):
-                        print(f"Downloaded to {relative_path_str}")
-                        logger.info(f"Successfully downloaded video PK {media.pk} to {download_path} (relative: {relative_path_str})")
-                    # If relative path failed, the error is already printed/logged above
+                        # Update print/log messages to reflect filename storage
+                        print(f"Downloaded. Filename: {filename_str}")
+                        logger.info(f"Successfully downloaded video PK {media.pk} to {download_path}. Storing filename: {filename_str}")
+                    # If filename extraction failed, the error is already printed/logged above
                 else: # Corresponds to `if download_path:`
                     print("Download failed (no path returned).")
                     logger.warning(f"Video download for PK {media.pk} returned no path.")

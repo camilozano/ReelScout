@@ -100,15 +100,13 @@ def test_download_success(mock_instagrapi_client, mock_media_items, collection_n
     mock_open.assert_called_once_with(expected_metadata_path, "w", encoding="utf-8")
     # Check metadata content passed to json.dump
     # The relative path is now calculated relative to download_dir
-    # download_dir = tmp_path / "downloads"
-    # download_path = tmp_path / "downloads" / collection_name / video_name
-    # relative_path = download_path.relative_to(download_dir) -> "collection_name/video_name"
-    # Calculate expected relative paths using the updated logic
-    expected_rel_path1 = expected_video1_path.relative_to(download_dir)
-    expected_rel_path2 = expected_video2_path.relative_to(download_dir)
+    # Check metadata content passed to json.dump
+    # The relative path should now be just the filename
+    expected_filename1 = expected_video1_path.name # e.g., "video_111.mp4"
+    expected_filename2 = expected_video2_path.name # e.g., "video_333.mp4"
     expected_metadata = [
         {
-            "relative_path": str(expected_rel_path1), # e.g., "Test Collection/video_111.mp4"
+            "relative_path": str(expected_filename1), # Expect filename
             "caption": "This is a cool video",
             "url": "https://www.instagram.com/p/CVideo1/",
             "pk": 111,
@@ -116,7 +114,7 @@ def test_download_success(mock_instagrapi_client, mock_media_items, collection_n
             "product_type": "feed",
         },
         {
-            "relative_path": str(expected_rel_path2), # e.g., "Test Collection/video_333.mp4"
+            "relative_path": str(expected_filename2), # Expect filename
             "caption": "", # Handled None caption
             "url": "https://www.instagram.com/p/CVideo2/",
             "pk": 333,

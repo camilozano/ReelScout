@@ -21,12 +21,15 @@ jobs:
       uses: actions/setup-python@v5 # Use the latest major version
       with:
         python-version: ${{ matrix.python-version }}
+        cache: 'poetry' # Add caching for Poetry dependencies
+
+    - name: Install Poetry
+      run: |
+        pipx install poetry
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -r requirements-dev.txt
+        poetry install --with dev # Install main and dev dependencies
 
     - name: Create dummy auth directory and session file for tests
       run: |
@@ -35,4 +38,4 @@ jobs:
 
     - name: Run tests with pytest
       run: |
-        pytest tests/
+        poetry run pytest tests/ # Run tests using poetry run

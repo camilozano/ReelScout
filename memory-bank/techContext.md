@@ -28,7 +28,7 @@
 **Tool Usage Patterns:**
 
 *   **IDE:** VS Code.
-*   **Package Management:** `pip` (standard for Python).
+*   **Package Management:** `Poetry` (using `pyproject.toml`).
 *   **Notebooks:** Jupyter Notebook (`3rdparty/gemini_video.ipynb`) used for initial exploration/prototyping with Gemini video capabilities.
 
 *(This document will be updated as specific libraries are chosen, versions are pinned, and the development environment evolves.)*

@@ -5,6 +5,7 @@
 **Current Focus:** Continuing core feature implementation (Gemini integration).
 
 **Recent Changes:**
+*   **Poetry Migration (01 Apr 2025):** Migrated project from `requirements.txt` to Poetry for dependency management and packaging. Configured `pyproject.toml` to define dependencies, dev dependencies, and expose the CLI script (`reel-scout`). Updated GitHub Actions workflow to use Poetry.
 *   **Test Fix (01 Apr 2025):** Resolved failure in `tests/test_reel_scout_cli.py::test_collect_success_custom_paths`. The issue stemmed from `click.Path` validation checks (`exists=True`, `readable=True`, `writable=True`, `dir_okay=True`) running before patches were active. The fix involved removing `os.path` patches and instead creating the required temporary file (`custom_session.touch()`) and directory (`custom_download.mkdir()`) using the `tmp_path` fixture before invoking the CLI command. This satisfies Click's validation using the actual filesystem state.
 *   **Bug Fix (01 Apr 2025):** Modified `reel_scout_cli.py` to resolve the `download_dir` path to an absolute path using `.resolve()` before passing it to `src/downloader.py`. This fixes an error where `pathlib.Path.relative_to()` failed because it was comparing an absolute download path with a relative base directory path.
 *   **Test Refactor (01 Apr 2025):** Initial attempt to update `tests/test_reel_scout_cli.py` (`test_collect_success_custom_paths`) involved mocking `pathlib.Path.exists`, which was insufficient due to Click's internal checks.
