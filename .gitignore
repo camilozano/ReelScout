@@ -1,3 +1,6 @@
 3rdparty/
 auth/
 .venv/
+*.pyc
+downloads/
+.DS_Store

@@ -6,7 +6,7 @@ from instagrapi import Client
 from instagrapi.exceptions import ClientError, LoginRequired
 from instagrapi.types import Collection, Media
 
-# SESSION_FILE = Path("auth/session") # Removed - will be passed via CLI
+# SESSION_FILE = Path("auth/session.json") # Removed - will be passed via CLI
 DOWNLOADS_DIR = Path("downloads") # Keep this for now, downloader uses it
 
 logger = logging.getLogger(__name__)
@@ -104,7 +104,7 @@ class InstagramClient:
 # if __name__ == "__main__":
 #     import argparse
 #     parser = argparse.ArgumentParser(description="Test InstagramClient login and collection fetching.")
-#     parser.add_argument("--session", type=Path, default=Path("auth/session"), help="Path to the session file.")
+#     parser.add_argument("--session", type=Path, default=Path("auth/session.json"), help="Path to the session file.")
 #     args = parser.parse_args()
 
 #     logging.basicConfig(level=logging.INFO)

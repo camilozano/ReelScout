@@ -15,10 +15,23 @@ def download_collection_media(
     client: Client,
     media_items: List[Media],
     collection_name: str,
-    download_dir: Path, # Added download_dir argument
+    download_dir: Path,
+    skip_download: bool = False, # Added skip_download flag
 ) -> bool:
     """
-    Downloads video media items from a list to a specific collection folder
+    Downloads video media items (or just collects metadata) from a list
+    to a specific collection folder within the specified download directory
+    and saves metadata about them.
+
+    Args:
+        client: Authenticated instagrapi Client instance.
+        media_items: List of Media objects to process.
+        collection_name: Name of the collection (used for folder name).
+        download_dir: The base directory where the collection folder should be created.
+        skip_download: If True, only metadata is saved, video download is skipped.
+
+    Returns:
+        True if metadata was successfully saved, False otherwise.
     within the specified download directory and saves metadata about them.
 
     Args:
@@ -43,61 +56,93 @@ def download_collection_media(
     metadata_list: List[Dict[str, Any]] = []
     total_items = len(media_items)
     download_count = 0
-    skipped_count = 0
+    metadata_only_count = 0 # New counter for skipped downloads
+    skipped_type_count = 0 # Counter for non-video types
+    error_count = 0 # Counter for errors
 
     print(f"Processing {total_items} items for collection '{collection_name}'...")
 
     for index, media in enumerate(media_items):
         print(f"  [{index + 1}/{total_items}] Processing item PK: {media.pk}...", end=" ")
 
-        # Only download videos (media_type=2 includes videos, reels, IGTV)
+        # Only process videos (media_type=2 includes videos, reels, IGTV)
         if media.media_type != 2:
             print("Skipped (not a video).")
-            skipped_count += 1
+            skipped_type_count += 1
             continue
 
-        try:
-            logger.info(f"Attempting to download video for media PK: {media.pk}")
-            # Use video_download as it should handle reels/igtv too
-            download_path = client.video_download(media.pk, folder=collection_dir)
+        # --- Metadata Collection ---
+        # Always collect metadata regardless of download skip
+        post_url = f"https://www.instagram.com/p/{media.code}/"
+        caption = media.caption_text or ""
+        # Initialize relative_path as None, update if downloaded
+        relative_path_str: str | None = None
 
-            if download_path:
-                # Calculate relative path based on the *parent* of the provided download_dir
-                # This assumes download_dir is relative to the project root (e.g., "downloads")
-                # If download_dir is absolute, this might need adjustment, but for CLI args, relative is typical.
-                relative_path_base = download_dir.parent
-                relative_path = download_path.relative_to(relative_path_base)
-                post_url = f"https://www.instagram.com/p/{media.code}/"
-                caption = media.caption_text or ""
+        item_metadata = {
+            "relative_path": relative_path_str, # Will be updated if downloaded
+            "caption": caption,
+            "url": post_url,
+            "pk": media.pk,
+            "media_type": media.media_type,
+            "product_type": media.product_type,
+        }
 
-                metadata_list.append({
-                    "relative_path": str(relative_path),
-                    "caption": caption,
-                    "url": post_url,
-                    "pk": media.pk,
-                    "media_type": media.media_type,
-                    "product_type": media.product_type,
-                })
-                download_count += 1
-                print(f"Downloaded to {relative_path}")
-                logger.info(f"Successfully downloaded video PK {media.pk} to {download_path}")
-            else:
-                print("Download failed (no path returned).")
-                logger.warning(f"Video download for PK {media.pk} returned no path.")
-                skipped_count += 1
+        # --- Conditional Download ---
+        if not skip_download:
+            try:
+                logger.info(f"Attempting to download video for media PK: {media.pk}")
+                # Use video_download as it should handle reels/igtv too
+                download_path = client.video_download(media.pk, folder=collection_dir)
 
-        except ClientError as e:
-            print(f"API Error downloading: {e}")
-            logger.error(f"ClientError downloading video PK {media.pk}: {e}")
-            skipped_count += 1
-        except Exception as e:
-            print(f"Unexpected Error downloading: {e}")
-            logger.exception(f"Unexpected error downloading video PK {media.pk}: {e}", exc_info=True)
-            skipped_count += 1
+                if download_path:
+                    # Calculate relative path based on the download directory provided
+                    try:
+                        relative_path = download_path.relative_to(download_dir)
+                        relative_path_str = str(relative_path) # Update the string path
+                        item_metadata["relative_path"] = relative_path_str # Update in metadata dict
+                        download_count += 1
+                    except ValueError as e:
+                        # This might happen if download_path is somehow outside download_dir
+                        # Log the error and keep relative_path_str as None
+                        logger.error(f"Could not calculate relative path for {download_path} based on {download_dir}: {e}")
+                        # Keep relative_path_str = None (already initialized)
+                        error_count += 1 # Count this as an error case
+                        print(f"Error calculating relative path for {download_path}.")
+                        # Continue processing other items, but don't increment download_count here
+                        # The item_metadata will be added with relative_path=None
 
-    print(f"\nDownload Summary for '{collection_name}':")
+                    # Only print/log success if relative path calculation succeeded
+                    if item_metadata.get("relative_path"):
+                        print(f"Downloaded to {relative_path_str}")
+                        logger.info(f"Successfully downloaded video PK {media.pk} to {download_path} (relative: {relative_path_str})")
+                    # If relative path failed, the error is already printed/logged above
+                else: # Corresponds to `if download_path:`
+                    print("Download failed (no path returned).")
+                    logger.warning(f"Video download for PK {media.pk} returned no path.")
+                    error_count += 1
+
+            except ClientError as e:
+                print(f"API Error downloading: {e}")
+                logger.error(f"ClientError downloading video PK {media.pk}: {e}")
+                error_count += 1
+            except Exception as e:
+                print(f"Unexpected Error downloading: {e}")
+                logger.exception(f"Unexpected error downloading video PK {media.pk}: {e}", exc_info=True)
+                error_count += 1
+        else:
+            # Skip download flag is True
+            print("Skipped download (metadata only).")
+            logger.info(f"Skipping video download for media PK: {media.pk} as requested.")
+            metadata_only_count += 1
+
+        # Append metadata regardless of download success/skip status
+        metadata_list.append(item_metadata)
+
+    print(f"\nCollection Summary for '{collection_name}':")
     print(f"  Successfully downloaded: {download_count}")
-    print(f"  Skipped/Errors:        {skipped_count}")
+    print(f"  Metadata only (skipped): {metadata_only_count}")
+    print(f"  Skipped (not video):     {skipped_type_count}")
+    print(f"  Errors:                  {error_count}")
 
     # Save metadata
     metadata_file = collection_dir / "metadata.json"
