@@ -75,21 +75,25 @@ def test_collect_success_defaults(runner, mock_collections_data, mock_media_data
         mock_instance.login.assert_called_once()
         mock_instance.get_collections.assert_called_once()
         mock_instance.get_media_from_collection.assert_called_once_with(mock_collections_data[0].id) # Use ID
+        # Expect the resolved absolute path for download_dir
+        expected_download_dir = Path("downloads").resolve()
         mock_download.assert_called_once_with(
-            client=mock_instance.client,
-            media_items=mock_media_data,
-            collection_name=mock_collections_data[0].name,
-            download_dir=Path("downloads"),
-            skip_download=False # Add default skip_download flag
-        )
+                client=mock_instance.client,
+                media_items=mock_media_data,
+                collection_name=mock_collections_data[0].name,
+                download_dir=expected_download_dir, # Expect resolved path
+                skip_download=False # Add default skip_download flag
+            )
 
 def test_collect_success_custom_paths(runner, mock_collections_data, mock_media_data, tmp_path):
     """Test successful run with custom session and download paths."""
     custom_session = tmp_path / "my_session.json"
     custom_download = tmp_path / "my_reels"
-    # Create dummy session file for exists=True check in click option
+    # Create the necessary file and directory to satisfy Click's checks
     custom_session.touch()
+    custom_download.mkdir()
 
+    # No longer need to patch os.path.exists or os.access for Click validation
     with patch('reel_scout_cli.InstagramClient') as MockInstagramClient, \
          patch('reel_scout_cli.download_collection_media') as mock_download, \
          patch('click.prompt') as mock_prompt:

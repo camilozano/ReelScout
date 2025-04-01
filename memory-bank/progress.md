@@ -28,11 +28,13 @@
     *   Potentially handle non-video media types differently if needed later.
 
 **Known Issues:**
+*   **FIXED (01 Apr 2025):** Pytest failure in `test_collect_success_custom_paths` due to `click.Path` validation checks failing before patches were active. Fixed by creating the temporary file/directory directly in the test setup instead of patching `os` functions.
 *   **FIXED (01 Apr 2025):** `ValueError` during relative path calculation in `src/downloader.py` due to comparing absolute download path with relative base directory path. Fixed by resolving the base path to absolute in `reel_scout_cli.py`.
 *   Potential instability due to reliance on unofficial Instagram API (`instagrapi`).
 *   No Gemini analysis functionality yet.
 
 **Decision Log:**
+*   **01 Apr 2025:** Determined that patching `os.path.exists` and `os.access` was insufficient for `click.Path` validation in tests. Switched strategy to creating the necessary temporary file/directory using `tmp_path` fixture (`custom_session.touch()`, `custom_download.mkdir()`) to satisfy Click's checks directly.
 *   **01 Apr 2025:** Decided to use `.resolve()` on the `download_dir` Path object in `reel_scout_cli.py` to ensure an absolute path is passed to the downloader function, fixing the `relative_to` error.
 *   *(Implicit)* Chose `instagrapi` for Instagram interaction.
 *   *(Implicit)* Chose `click` for CLI framework.
