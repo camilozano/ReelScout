@@ -87,12 +87,16 @@ def collect_reels(session_file: Path, download_dir: Path, skip_download: bool):
         click.echo("Starting metadata collection process (skipping video downloads)...")
     else:
         click.echo("Starting download process (only videos will be downloaded)...")
-    # Pass the download_dir and skip_download flags from the CLI options
+    # Resolve the download directory to an absolute path before passing
+    absolute_download_dir = download_dir.resolve()
+    click.echo(f"Using absolute download directory: {absolute_download_dir}") # Optional: for clarity
+
+    # Pass the absolute download_dir and skip_download flags from the CLI options
     success = download_collection_media(
         client=insta_client.client,
         media_items=media_items,
         collection_name=selected_collection.name,
-        download_dir=download_dir,
+        download_dir=absolute_download_dir, # Pass the resolved path
         skip_download=skip_download # Pass the flag here
     )
 
