@@ -6,60 +6,58 @@
 
 ```mermaid
 graph TD
-    subgraph User Interaction
-        A[CLI (reel-scout)]
+    subgraph User_Interaction["User Interaction"]
+        A["CLI (reel-scout)"]
     end
 
-    subgraph Core Modules
-        B[Instagram Client (src/instagram_client.py)]
-        C[Downloader (src/downloader.py)]
-        D[AI Analyzer (src/ai_analyzer.py)]
-        LE[Location Enricher (src/location_enricher.py)]
-        E[Output Handler (TBD - currently handled in CLI)]
+    subgraph Core_Modules["Core Modules"]
+        B["Instagram Client (src/instagram_client.py)"]
+        C["Downloader (src/downloader.py)"]
+        D["AI Analyzer (src/ai_analyzer.py)"]
+        LE["Location Enricher (src/location_enricher.py)"]
+        E["Output Handler (TBD - currently handled in CLI)"]
     end
 
-    subgraph Data
-        F[auth/session.json]
-        G[auth/.env]
-        H[downloads/{collection_name}/metadata.json]
-        I[downloads/{collection_name}/{video_files}]
-        J[Analysis Results (e.g., CSV, updated JSON)]
+    subgraph Data["Data"]
+        F["auth/session.json"]
+        G["auth/.env"]
+        H["downloads/{collection_name}/metadata.json"]
+        I["downloads/{collection_name}/{video_files}"]
+        J["Analysis Results (e.g., CSV, updated JSON)"]
     end
 
-    subgraph External Services
-        K[Instagram (via instagrapi)]
-        L[Google Gemini API (via google-generativeai)]
-        GMaps[Google Maps API (via googlemaps)]
+    subgraph External_Services["External Services"]
+        K["Instagram (via instagrapi)"]
+        L["Google Gemini API (via google-generativeai)"]
+        GMaps["Google Maps API (via googlemaps)"]
     end
 
-    A -- Uses --> B;
-    A -- Uses --> C;
-    A -- Uses --> D;
-    A -- Uses --> LE; # CLI uses Location Enricher
-    A -- Uses --> E;
+    A --> B
+    A --> C
+    A --> D
+    A --> LE
+    A --> E
 
-    B -- Reads --> F;
-    B -- Interacts --> K;
-    B -- Collection/Media Info --> A;
+    B -->|Reads| F
+    B -->|Interacts| K
+    B -->|Collection/Media Info| A
 
-    C -- Reads --> H;
-    C -- Writes --> I;
-    C -- Video Path/Metadata --> A;
+    C -->|Reads| H
+    C -->|Writes| I
+    C -->|Video Path/Metadata| A
 
-    D -- Reads --> G;
-    D -- Reads Caption --> A; # Caption passed from CLI
-    D -- Reads Video (Future) --> I;
-    D -- Interacts --> L;
-    D -- Analysis --> A; # Analysis results passed back to CLI
+    D -->|Reads| G
+    D -->|Reads Caption| A
+    D -->|"Reads Video (Future)"| I
+    D -->|Interacts| L
+    D -->|Analysis| A
 
-    LE -- Reads --> G; # Reads GOOGLE_PLACES_API key
-    LE -- Interacts --> GMaps; # Interacts with Google Maps API
-    LE -- Enrichment Data --> A; # Enrichment results passed back to CLI
+    LE -->|Reads| G
+    LE -->|Interacts| GMaps
+    LE -->|Enrichment Data| A
 
-    A -- Updates --> H; # CLI updates metadata.json after analysis & enrichment
-
-    E -- Writes --> J; # Future output handler
-
+    A -->|Updates| H
+    E -->|Writes| J
 ```
 
 **Key Technical Decisions:**
