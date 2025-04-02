@@ -1,12 +1,14 @@
 import click
 import logging
 import sys
-from pathlib import Path # Add Path import
+import json # Add json import
+from pathlib import Path
 from src.instagram_client import InstagramClient
 from src.downloader import download_collection_media
+from src.ai_analyzer import analyze_caption_for_location # Import the analyzer function
 
 # Configure basic logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s') # Simplified format slightly
 # Suppress noisy instagrapi logging unless needed
 logging.getLogger("instagrapi").setLevel(logging.WARNING)
 
@@ -17,6 +19,7 @@ def cli():
     """ReelScout: Collect and analyze Instagram Reels."""
     pass
 
+# --- Collect Command ---
 @cli.command('collect')
 @click.option(
     '--session-file',
@@ -107,6 +110,96 @@ def collect_reels(session_file: Path, download_dir: Path, skip_download: bool):
     else:
         click.echo("\n--- Collection process finished with errors. ---", err=True)
         sys.exit(1)
+
+
+# --- Analyze Command ---
+@cli.command('analyze')
+@click.option(
+    '--collection-name',
+    required=True,
+    type=str,
+    help="Name of the collection directory (and metadata file) to analyze.",
+)
+@click.option(
+    '--download-dir',
+    type=click.Path(file_okay=False, dir_okay=True, path_type=Path, exists=True), # Ensure base dir exists
+    default=Path("downloads"),
+    help="Base directory where collection data is stored.",
+    show_default=True,
+)
+def analyze_collection(collection_name: str, download_dir: Path):
+    """Analyze captions in a collection's metadata.json using Gemini."""
+    click.echo("--- ReelScout Analysis ---")
+    click.echo(f"Analyzing collection: {collection_name}")
+    click.echo(f"Using download directory: {download_dir}")
+
+    metadata_path = download_dir.resolve() / collection_name / "metadata.json"
+
+    if not metadata_path.is_file():
+        logger.error(f"Metadata file not found: {metadata_path}")
+        click.echo(f"Error: Metadata file not found at {metadata_path}", err=True)
+        sys.exit(1)
+
+    click.echo(f"Reading metadata from: {metadata_path}")
+    try:
+        with open(metadata_path, 'r') as f:
+            metadata_items = json.load(f)
+    except json.JSONDecodeError:
+        logger.exception(f"Failed to decode JSON from {metadata_path}")
+        click.echo(f"Error: Could not read or parse JSON from {metadata_path}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        logger.exception(f"Failed to read metadata file {metadata_path}")
+        click.echo(f"Error: Could not read metadata file: {e}", err=True)
+        sys.exit(1)
+
+    if not metadata_items:
+        click.echo("Metadata file is empty. Nothing to analyze.")
+        sys.exit(0)
+
+    click.echo(f"Found {len(metadata_items)} items to analyze.")
+    updated_items = []
+    analysis_errors = 0
+
+    with click.progressbar(metadata_items, label='Analyzing captions') as bar:
+        for item in bar:
+            caption = item.get('caption')
+            if not caption:
+                logger.warning(f"Item with URL {item.get('url', 'N/A')} has no caption. Skipping analysis.")
+                item['caption_analysis'] = {"location_found": False, "locations": None, "error": "No caption provided"}
+                updated_items.append(item)
+                continue
+
+            try:
+                # Call the analysis function from ai_analyzer
+                analysis_result = analyze_caption_for_location(caption)
+                item['caption_analysis'] = analysis_result
+                if analysis_result.get("error"):
+                    logger.warning(f"Analysis error for URL {item.get('url', 'N/A')}: {analysis_result['error']}")
+                    analysis_errors += 1
+            except Exception as e:
+                # Catch unexpected errors during the analysis call itself
+                logger.exception(f"Unexpected error analyzing caption for URL {item.get('url', 'N/A')}")
+                item['caption_analysis'] = {"location_found": False, "locations": None, "error": f"Unexpected analysis error: {str(e)}"}
+                analysis_errors += 1
+
+            updated_items.append(item)
+
+    click.echo(f"\nAnalysis complete. {analysis_errors} items had analysis errors (check logs).")
+
+    # Overwrite the original metadata file with the updated data
+    click.echo(f"Saving updated metadata back to: {metadata_path}")
+    try:
+        with open(metadata_path, 'w') as f:
+            json.dump(updated_items, f, indent=4)
+        click.echo("Metadata file updated successfully.")
+    except Exception as e:
+        logger.exception(f"Failed to write updated metadata to {metadata_path}")
+        click.echo(f"Error: Could not write updated metadata file: {e}", err=True)
+        sys.exit(1)
+
+    click.echo("\n--- Analysis process completed! ---")
+
 
 if __name__ == '__main__':
     cli()

@@ -1,50 +1,82 @@
 # System Patterns: ReelScout
 
-*(This document will outline the high-level architecture, key technical decisions, design patterns, and component relationships as they are established.)*
+*(This document outlines the high-level architecture, key technical decisions, design patterns, and component relationships.)*
 
-**Initial Architecture (Conceptual):**
+**Current Architecture:**
 
 ```mermaid
 graph TD
-    A[User Input (Reel URL)] --> B(Instagram Fetcher);
-    B -- Video Data --> C(Video Processor);
-    C -- Processed Data --> D(Gemini Analyzer);
-    D -- Analysis Results --> E(Output Formatter);
-    E --> F[User Output (Insights)];
+    subgraph User Interaction
+        A[CLI (reel-scout)]
+    end
 
-    subgraph Core Logic
-        B
-        C
-        D
-        E
+    subgraph Core Modules
+        B[Instagram Client (src/instagram_client.py)]
+        C[Downloader (src/downloader.py)]
+        D[AI Analyzer (src/ai_analyzer.py)]
+        E[Output Handler (TBD)]
+    end
+
+    subgraph Data
+        F[auth/session.json]
+        G[auth/.env]
+        H[downloads/{collection_name}/metadata.json]
+        I[downloads/{collection_name}/{video_files}]
+        J[Analysis Results (e.g., CSV, updated JSON)]
     end
 
     subgraph External Services
-        G[Instagram API/Library]
-        H[Google Gemini API]
+        K[Instagram (via instagrapi)]
+        L[Google Gemini API (via google-generativeai)]
     end
 
-    B --> G;
-    D --> H;
+    A -- Uses --> B;
+    A -- Uses --> C;
+    A -- Uses --> D;
+    A -- Uses --> E;
+
+    B -- Reads --> F;
+    B -- Interacts --> K;
+    B -- Collection/Media Info --> A;
+
+    C -- Reads --> H;
+    C -- Writes --> I;
+    C -- Video Path/Metadata --> A;
+
+    D -- Reads --> G;
+    D -- Reads Caption --> A;
+    D -- Reads Video (Future) --> I;
+    D -- Interacts --> L;
+    D -- Analysis --> A;
+
+    E -- Writes --> J;
+
 ```
 
-**Key Technical Decisions (To Be Made):**
+**Key Technical Decisions:**
 
-*   **Instagram Library/API:** Which library or method will be used to fetch Reels data? (e.g., `instagrapi`, official API if available, other methods).
-*   **Video Processing:** How will video files be handled? Downloaded temporarily? Streamed? What format is needed for Gemini?
-*   **Gemini Model:** Which specific Gemini model(s) are best suited for video analysis?
-*   **Programming Language/Framework:** What language will the core logic be implemented in? (Likely Python given the AI/ML context).
-*   **Data Flow:** How will data be passed between components? Simple function calls? Queues?
+*   **Instagram Library:** `instagrapi` (Chosen, implemented in `src/instagram_client.py`).
+*   **CLI Framework:** `click` (Chosen, implemented in `reel_scout_cli.py`).
+*   **Dependency Management:** `Poetry` (Chosen).
+*   **Path Handling:** `pathlib` (Chosen).
+*   **Configuration:** Session via `auth/session.json`, API Key via `auth/.env` (using `python-dotenv`).
+*   **Video Handling:** Videos are downloaded locally first (`src/downloader.py`).
+    *   **Gemini Model (Text):** `models/gemini-2.0-flash-exp` (Updated 01 Apr 2025 from `models/gemini-1.5-pro-latest` per user request; originally fixed from `gemini-pro` 404 error).
+    *   **Gemini Model (Video):** TBD (e.g., `gemini-pro-vision`, `gemini-1.5-flash`).
+    *   **Programming Language:** Python 3.
+*   **Data Flow:** Primarily direct function calls between modules orchestrated by the CLI. Metadata stored in `metadata.json`. Analysis results format TBD.
 
-**Design Patterns (To Be Identified):**
+**Design Patterns:**
 
-*   *(Patterns like Facade, Adapter, Strategy might be relevant as the system evolves to handle different APIs or analysis types.)*
+*   **Modular Design:** Separate modules for distinct concerns (Instagram client, downloader, AI analyzer).
+*   **Configuration Management:** Loading sensitive data (API keys) from environment variables via `.env`.
 
 **Component Relationships:**
 
-*   The `Instagram Fetcher` is responsible for interacting with Instagram.
-*   The `Video Processor` prepares the video data for AI analysis.
-*   The `Gemini Analyzer` handles communication with the Gemini API.
-*   The `Output Formatter` presents the results.
+*   `reel_scout_cli.py`: Orchestrates the workflow, handles user input, and calls other modules.
+*   `src/instagram_client.py`: Handles authentication and interaction with the Instagram API via `instagrapi`. Fetches collection and media data.
+*   `src/downloader.py`: Downloads media files and saves metadata to `metadata.json`.
+*   `src/ai_analyzer.py`: Handles interaction with the Google Gemini API. Contains functions for text analysis (`analyze_caption_for_location`) and planned video analysis.
+*   `Output Handler` (TBD): Will be responsible for formatting and saving the final analysis results (e.g., to CSV).
 
-*(This document will be updated as technical decisions are made and patterns emerge.)*
+*(This document will be updated as the architecture evolves and further decisions are made.)*
