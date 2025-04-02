@@ -2,9 +2,22 @@
 
 *(This document tracks the current focus, recent changes, next steps, active decisions, patterns, and learnings.)*
 
-**Current Focus:** Implementing Gemini video analysis.
+**Current Focus:** Implementing Gemini video analysis (Location enrichment via Google Maps is now integrated, fixed, and includes Google Maps URI).
 
 **Recent Changes:**
+*   **Google Maps URI Added (02 Apr 2025):**
+    *   Modified `src/location_enricher.py::enrich_location_data` to perform a second API call (`gmaps.place`) using the `place_id` obtained from the initial `gmaps.find_place` call.
+    *   This second call specifically requests the 'url' field, which contains the Google Maps URI, along with other details.
+    *   Added `google_maps_uri` to the dictionary returned by the function.
+    *   Updated unit tests in `tests/test_location_enricher.py` to mock both API calls (`find_place` and `place`) and assert the presence and correctness of the `google_maps_uri`.
+*   **Google Maps Enrichment Fix (02 Apr 2025):**
+    *   Fixed `ValueError` in `src/location_enricher.py` caused by requesting the invalid 'url' field from the Google Maps `find_place` API. Removed 'url' from the `fields` list in the API call and from the returned dictionary.
+    *   Updated corresponding unit tests in `tests/test_location_enricher.py` to reflect the removal of the 'url' field in mock calls and assertions.
+*   **Google Maps Location Enrichment (02 Apr 2025):**
+    *   Added `googlemaps` dependency via Poetry.
+    *   Created `src/location_enricher.py` module with `enrich_location_data` function to query Google Maps Places API (using `find_place`) for location details based on names extracted by AI. Loads `GOOGLE_PLACES_API` key from `auth/.env`.
+    *   Integrated `enrich_location_data` into the `analyze` command in `reel_scout_cli.py`. The command now performs AI caption analysis first, then iterates through found locations to enrich them using Google Maps, updating the `metadata.json` file with a `google_maps_enrichment` list containing results or errors for each location.
+    *   Added unit tests (`tests/test_location_enricher.py`) for `src/location_enricher.py` covering success, zero results, API errors/exceptions, and invalid input scenarios using `pytest` and `unittest.mock`.
 *   **AI Analyzer Unit Tests (01 Apr 2025):** Added mocked unit tests (`tests/test_ai_analyzer.py`) for `src/ai_analyzer.py::analyze_caption_for_location` using `pytest` and `pytest-mock`. Tests cover successful parsing (via `response.parsed` and fallback), empty input, API errors, and various JSON response handling scenarios (malformed JSON, incorrect structure, invalid types). Updated `analyze_caption_for_location` to use `model_dump()` instead of deprecated `dict()`.
 *   **Gemini Structured Output (01 Apr 2025):** Refactored `src/ai_analyzer.py::analyze_caption_for_location` to use Gemini's native JSON mode. Added `pydantic` dependency (v2.10.1 due to `instagrapi` constraint). Defined a `LocationResponse` Pydantic model for the schema. Simplified the prompt and updated the `generate_content` call to use `generation_config` with `response_mime_type="application/json"` and the Pydantic schema. Updated response handling to use `response.parsed` with fallback to `json.loads(response.text)`.
 *   **AI Prompt Update (01 Apr 2025):** Modified the prompt in `src/ai_analyzer.py::analyze_caption_for_location` to explicitly request geographical context (city, region, etc.) alongside specific locations.
@@ -19,15 +32,15 @@
 *   **Project Renaming:** Renamed project from "Instarecs" to "ReelScout" across documentation.
 
 **Next Steps:**
-1.  Integrate `analyze_caption_for_location` into the main CLI workflow (e.g., add an `analyze` command or integrate into `collect`).
-2.  Implement Gemini video analysis:
+1.  Implement Gemini video analysis:
     *   Determine the appropriate Gemini model (e.g., `gemini-pro-vision`, `gemini-1.5-flash`).
     *   Implement video file upload/processing compatible with the chosen Gemini model (referencing `3rdparty/gemini_video.ipynb` and `3rdparty/python-genai-docs/`).
     *   Create a function `analyze_video_for_location` in `src/ai_analyzer.py`.
-    *   Integrate video analysis into the workflow (e.g., call if caption analysis yields no results).
-    *   Add unit tests for video analysis function.
-3.  Implement logic to store/output the combined analysis results (e.g., update `metadata.json` or create a new output file/format like CSV).
-4.  Refine error handling and logging for the AI analysis parts.
+    *   Integrate video analysis into the `analyze` command workflow (e.g., call if caption analysis yields no results or if specifically requested).
+    *   Add unit tests for the video analysis function.
+2.  Refine the structure of `metadata.json` if needed, based on how video analysis results are stored alongside caption analysis and enrichment.
+3.  Consider adding a dedicated output step/command (e.g., to generate a CSV from the enriched `metadata.json`).
+4.  Refine error handling and logging, particularly for the enrichment and upcoming video analysis steps.
 
 **Active Decisions/Considerations:**
 *   Choosing the specific Gemini model for *video* analysis (balancing cost, capability, speed).
@@ -39,10 +52,11 @@
 *   Using `click` for the command-line interface.
 *   Using `instagrapi` for Instagram interaction.
 *   Using `google-generativeai` for Gemini interaction.
+*   Using `googlemaps` for Google Maps interaction.
 *   Using `pydantic` for data validation and schema definition (especially with Gemini JSON mode).
 *   Using `python-dotenv` for loading environment variables.
 *   Storing session data in `auth/session.json`.
-*   Storing API keys in `auth/.env`.
+*   Storing API keys (`GEMINI_API_KEY`, `GOOGLE_PLACES_API`) in `auth/.env`.
 *   Using Memory Bank (Markdown files in `memory-bank/`) for project documentation.
 
 **Learnings/Insights:**

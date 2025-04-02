@@ -32,7 +32,10 @@ The final output should be some csv that includes the post url, and the location
 
 ## Data Cleanup 
 
-As a bonus last step we want to the Google Maps url of the places mentioned, it doesn't have to be perfect just return the most likely relevant url for each location. We can use the Gemini API with search grounding to return the URL as structured output or we can implement with the google maps places api
+We want to query Google Maps the provided location and update our metadata to include the location name, url, and address
+
+We'll use the Google Maps Python Library to do this. I've provided the docs in `3rdparty/google-maps-python-docs.html`
+The API key will be in `auth/.env` in a variable called `GOOGLE_PLACES_API`
 
 ## UI 
 

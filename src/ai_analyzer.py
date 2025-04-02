@@ -17,8 +17,8 @@ if not API_KEY:
 
 genai.configure(api_key=API_KEY)
 
-# Using the requested experimental Flash model
-model = genai.GenerativeModel('models/gemini-2.0-flash-exp')
+# model = genai.GenerativeModel('models/gemini-2.0-flash-exp')
+model = genai.GenerativeModel('models/gemini-2.0-flash-lite')
 
 # Define the expected response structure using Pydantic
 class LocationResponse(BaseModel):
@@ -49,6 +49,7 @@ Analyze the following Instagram post caption to identify specific locations ment
 Focus on precise places like restaurants, landmarks, points of interest, shops, parks, specific addresses, etc.
 For each specific location found, also include any mentioned city, state, region, or country that provides context for that location.
 If only a general area (like a city or country) is mentioned without a specific point of interest, include that as well only if there is not a specific location mentioned.
+Do not include general areas as individual items in the list, include them as part of the context for specific locations.
 
 Caption:
 "{caption}"
@@ -72,7 +73,9 @@ Caption:
             # Note: response.parsed might not exist or be None if parsing/validation failed silently
              if hasattr(response, 'parsed') and response.parsed:
                   # Convert Pydantic model to dict for consistent return type
-                 return response.parsed.model_dump() # Use model_dump() for Pydantic v2
+                 parsed_data = response.parsed.model_dump() # Use model_dump() for Pydantic v2
+                 print(f"\n--- Parsed Locations (Pydantic): {parsed_data.get('locations')} ---") # ADDED PRINT
+                 return parsed_data
              else:
                  # Fallback: Manually parse the text if .parsed is not available
                 # The API should guarantee valid JSON here due to response_mime_type
@@ -82,8 +85,10 @@ Caption:
                     if "location_found" in parsed_fallback and "locations" in parsed_fallback:
                          # Validate locations format
                          if parsed_fallback["locations"] is None or isinstance(parsed_fallback["locations"], list):
+                             print(f"\n--- Parsed Locations: {parsed_fallback.get('locations')} ---")
                              return parsed_fallback
                          else:
+                             # No locations found or invalid format, don't print
                              return {"location_found": False, "locations": None, "error": "Invalid 'locations' format in fallback JSON", "raw_response": response.text}
                     else:
                          return {"location_found": False, "locations": None, "error": "Invalid structure in fallback JSON", "raw_response": response.text}
@@ -98,8 +103,10 @@ Caption:
                  parsed_fallback = json.loads(response.text)
                  if "location_found" in parsed_fallback and "locations" in parsed_fallback:
                      if parsed_fallback["locations"] is None or isinstance(parsed_fallback["locations"], list):
+                         print(f"--- Parsed Locations (Fallback JSON after Error): {parsed_fallback.get('locations')} ---") # ADDED PRINT
                          return parsed_fallback
                      else:
+                         # Invalid format, don't print
                          return {"location_found": False, "locations": None, "error": "Invalid 'locations' format in fallback JSON after error", "raw_response": response.text}
                  else:
                      return {"location_found": False, "locations": None, "error": "Invalid structure in fallback JSON after error", "raw_response": response.text}
@@ -111,26 +118,3 @@ Caption:
         # Catch potential API call errors or other exceptions during generation
         print(f"Error calling Gemini API: {e}")
         return {"location_found": False, "locations": None, "error": f"Gemini API call failed: {str(e)}"}
-
-# Example usage (for testing purposes)
-if __name__ == '__main__':
-    test_caption_1 = "Had an amazing time at the Eiffel Tower today! #paris #travel"
-    test_caption_2 = "Best pizza ever at Joe's Pizza on Carmine St."
-    test_caption_3 = "Just exploring California."
-    test_caption_4 = "" # Empty caption
-
-    print(f"Analyzing: '{test_caption_1}'")
-    print(analyze_caption_for_location(test_caption_1))
-    print("-" * 20)
-
-    print(f"Analyzing: '{test_caption_2}'")
-    print(analyze_caption_for_location(test_caption_2))
-    print("-" * 20)
-
-    print(f"Analyzing: '{test_caption_3}'")
-    print(analyze_caption_for_location(test_caption_3))
-    print("-" * 20)
-
-    print(f"Analyzing: '{test_caption_4}'")
-    print(analyze_caption_for_location(test_caption_4))
-    print("-" * 20)
