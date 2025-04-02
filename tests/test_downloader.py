@@ -282,7 +282,7 @@ def test_download_skip_existing_file(mock_instagrapi_client, mock_media_items, c
     mock_instagrapi_client.video_download.assert_not_called()
     # Check glob was called correctly
     # Note: Since we patched Path.glob globally, we check the call on the class
-    pathlib.Path.glob.assert_called_once_with(f"{video_item.pk}*")
+    Path.glob.assert_called_once_with(f"{video_item.pk}*")
 
     # Check metadata content passed to json.dump
     expected_metadata = [
@@ -327,7 +327,7 @@ def test_download_existing_file_with_skip_download_flag(mock_instagrapi_client, 
     # Assertions
     assert result is True
     mock_instagrapi_client.video_download.assert_not_called() # Should not be called
-    pathlib.Path.glob.assert_called_once_with(f"{video_item.pk}*")
+    Path.glob.assert_called_once_with(f"{video_item.pk}*")
 
     # Check metadata still reflects the *existing* file, not None
     expected_metadata = [
@@ -370,7 +370,7 @@ def test_download_no_existing_file_proceeds(mock_instagrapi_client, mock_media_i
 
     # Assertions
     assert result is True
-    pathlib.Path.glob.assert_called_once_with(f"{video_item.pk}*")
+    Path.glob.assert_called_once_with(f"{video_item.pk}*")
     # Download *should* be called
     mock_instagrapi_client.video_download.assert_called_once_with(video_item.pk, folder=collection_dir)
 

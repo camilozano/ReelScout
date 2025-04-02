@@ -91,7 +91,7 @@ def download_collection_media(
 
         # --- Check for Existing File ---
         # Check if a file starting with the PK already exists in the directory
-        existing_files = list(collection_dir.glob(f"*{media.pk}*"))
+        existing_files = list(collection_dir.glob(f"{media.pk}*")) # Corrected glob pattern
         if existing_files:
             already_exists = True
             found_path = existing_files[0] # Use the first match

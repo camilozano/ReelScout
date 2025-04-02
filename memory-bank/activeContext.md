@@ -5,6 +5,7 @@
 **Current Focus:** Implementing Gemini video analysis (Location enrichment via Google Maps is now integrated, fixed, and includes Google Maps URI).
 
 **Recent Changes:**
+*   **Downloader Test Fix (02 Apr 2025):** Fixed failing tests (`test_download_skip_existing_file`, `test_download_existing_file_with_skip_download_flag`, `test_download_no_existing_file_proceeds`) in `tests/test_downloader.py`. The issue was an incorrect glob pattern (`*{media.pk}*` instead of `{media.pk}*`) used in `src/downloader.py` to check for existing files. Corrected the pattern and verified all tests pass.
 *   **Downloader Idempotency (02 Apr 2025):**
     *   Modified `src/downloader.py::download_collection_media` to check if a file starting with the media item's PK already exists in the target directory using `Path.glob(f"{media.pk}*")` before attempting download.
     *   If an existing file is found, the download is skipped, a message is logged, and the existing filename is stored in the `relative_path` field of the metadata.
