@@ -2,9 +2,10 @@
 
 *(This document tracks the current focus, recent changes, next steps, active decisions, patterns, and learnings.)*
 
-**Current Focus:** Implementing Gemini video analysis (Location enrichment via Google Maps is now integrated, fixed, and includes Google Maps URI).
+**Current Focus:** Implementing Gemini video analysis (Location enrichment via Google Maps is now integrated, fixed, and includes Google Maps URI). Pytest setup is now stable.
 
 **Recent Changes:**
+*   **Pytest Env Var Fix (02 Apr 2025):** Resolved `pytest` collection errors (`ValueError: GEMINI_API_KEY not found...`) and subsequent `ScopeMismatch` errors. Created `tests/conftest.py` with a session-scoped, autouse fixture (`set_env_vars_session_scope`) that uses `os.environ` to set dummy `GEMINI_API_KEY` and `GOOGLE_PLACES_API` variables before tests are collected. This prevents import-time errors in modules checking for these variables.
 *   **Downloader Test Fix (02 Apr 2025):** Fixed failing tests (`test_download_skip_existing_file`, `test_download_existing_file_with_skip_download_flag`, `test_download_no_existing_file_proceeds`) in `tests/test_downloader.py`. The issue was an incorrect glob pattern (`*{media.pk}*` instead of `{media.pk}*`) used in `src/downloader.py` to check for existing files. Corrected the pattern and verified all tests pass.
 *   **Downloader Idempotency (02 Apr 2025):**
     *   Modified `src/downloader.py::download_collection_media` to check if a file starting with the media item's PK already exists in the target directory using `Path.glob(f"{media.pk}*")` before attempting download.

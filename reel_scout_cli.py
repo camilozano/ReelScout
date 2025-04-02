@@ -6,7 +6,7 @@ from pathlib import Path
 import time # Import time for potential delays
 from src.instagram_client import InstagramClient
 from src.downloader import download_collection_media
-from src.ai_analyzer import analyze_caption_for_location
+from src.ai_analyzer import AIAnalyzer # Import the class
 from src.location_enricher import enrich_location_data # Import the enrichment function
 
 # Configure basic logging
@@ -165,6 +165,15 @@ def analyze_collection(collection_name: str, download_dir: Path):
     enrichment_errors = 0
     enrichment_success = 0
 
+    # Instantiate the AI Analyzer
+    try:
+        analyzer = AIAnalyzer()
+        click.echo(f"Using AI model: {analyzer.model_name}")
+    except ValueError as e:
+        logger.error(f"Failed to initialize AI Analyzer: {e}")
+        click.echo(f"Error initializing AI Analyzer: {e}. Ensure GEMINI_API_KEY is set.", err=True)
+        sys.exit(1)
+
     # Analyze captions first
     click.echo("Phase 1: Analyzing captions with AI...")
     with click.progressbar(metadata_items, label='Analyzing captions') as bar:
@@ -182,8 +191,8 @@ def analyze_collection(collection_name: str, download_dir: Path):
                 continue
 
             try:
-                # Call the analysis function from ai_analyzer
-                analysis_result = analyze_caption_for_location(caption)
+                # Call the analysis method on the analyzer instance
+                analysis_result = analyzer.analyze_caption_for_location(caption)
                 # Merge analysis results into existing dict
                 item['caption_analysis'].update(analysis_result)
                 if analysis_result.get("error"):
