@@ -243,3 +243,148 @@ def test_download_metadata_save_type_error(mock_instagrapi_client, mock_media_it
     assert result is False
     mock_json_dump.assert_called_once() # Check it was called
     assert "Error: Could not serialize metadata to JSON: Cannot serialize object" in captured.out
+
+
+# --- Tests for Skip Existing Logic ---
+
+def test_download_skip_existing_file(mock_instagrapi_client, mock_media_items, collection_name, tmp_path, mocker):
+    """Test that download is skipped if a file with the PK prefix already exists."""
+    download_dir = tmp_path / "downloads"
+    collection_dir = download_dir / collection_name
+    video_item = [m for m in mock_media_items if m.pk == 111][0] # Get the first video item
+    existing_file_name = f"{video_item.pk}_existing_video.mp4"
+    existing_file_path = collection_dir / existing_file_name
+
+    # Mock Path.glob to simulate finding an existing file
+    mock_glob_result = [existing_file_path]
+    mock_path_instance = MagicMock()
+    mock_path_instance.glob.return_value = mock_glob_result
+    # We need to patch the Path object used *within* the function, which is collection_dir
+    mocker.patch('pathlib.Path.glob', return_value=mock_glob_result)
+    # Ensure the directory exists for the glob check
+    collection_dir.mkdir(parents=True, exist_ok=True)
+
+    # Patch open and json.dump for metadata verification
+    with patch("builtins.open", MagicMock()) as mock_open, \
+         patch("json.dump", MagicMock()) as mock_json_dump:
+
+        # Call the function (skip_download=False by default)
+        result = download_collection_media(
+            client=mock_instagrapi_client,
+            media_items=[video_item],
+            collection_name=collection_name,
+            download_dir=download_dir
+        )
+
+    # Assertions
+    assert result is True # Metadata saving should still succeed
+    # Crucially, video_download should NOT be called
+    mock_instagrapi_client.video_download.assert_not_called()
+    # Check glob was called correctly
+    # Note: Since we patched Path.glob globally, we check the call on the class
+    pathlib.Path.glob.assert_called_once_with(f"{video_item.pk}*")
+
+    # Check metadata content passed to json.dump
+    expected_metadata = [
+        {
+            "relative_path": existing_file_name, # Should contain the existing filename
+            "caption": video_item.caption_text,
+            "url": f"https://www.instagram.com/p/{video_item.code}/",
+            "pk": video_item.pk,
+            "media_type": video_item.media_type,
+            "product_type": video_item.product_type,
+        },
+    ]
+    mock_json_dump.assert_called_once_with(
+        expected_metadata, mock_open().__enter__(), indent=4, ensure_ascii=False
+    )
+
+def test_download_existing_file_with_skip_download_flag(mock_instagrapi_client, mock_media_items, collection_name, tmp_path, mocker):
+    """Test that existing file check takes precedence over skip_download flag for metadata."""
+    download_dir = tmp_path / "downloads"
+    collection_dir = download_dir / collection_name
+    video_item = [m for m in mock_media_items if m.pk == 111][0]
+    existing_file_name = f"{video_item.pk}_another_existing.mp4"
+    existing_file_path = collection_dir / existing_file_name
+
+    # Mock Path.glob
+    mock_glob_result = [existing_file_path]
+    mocker.patch('pathlib.Path.glob', return_value=mock_glob_result)
+    collection_dir.mkdir(parents=True, exist_ok=True)
+
+    with patch("builtins.open", MagicMock()) as mock_open, \
+         patch("json.dump", MagicMock()) as mock_json_dump:
+
+        # Call the function with skip_download=True
+        result = download_collection_media(
+            client=mock_instagrapi_client,
+            media_items=[video_item],
+            collection_name=collection_name,
+            download_dir=download_dir,
+            skip_download=True # Explicitly set skip flag
+        )
+
+    # Assertions
+    assert result is True
+    mock_instagrapi_client.video_download.assert_not_called() # Should not be called
+    pathlib.Path.glob.assert_called_once_with(f"{video_item.pk}*")
+
+    # Check metadata still reflects the *existing* file, not None
+    expected_metadata = [
+        {
+            "relative_path": existing_file_name, # Existing filename takes precedence
+            "caption": video_item.caption_text,
+            "url": f"https://www.instagram.com/p/{video_item.code}/",
+            "pk": video_item.pk,
+            "media_type": video_item.media_type,
+            "product_type": video_item.product_type,
+        },
+    ]
+    mock_json_dump.assert_called_once_with(
+        expected_metadata, mock_open().__enter__(), indent=4, ensure_ascii=False
+    )
+
+def test_download_no_existing_file_proceeds(mock_instagrapi_client, mock_media_items, collection_name, tmp_path, mocker):
+    """Test that download proceeds normally if no existing file is found."""
+    download_dir = tmp_path / "downloads"
+    collection_dir = download_dir / collection_name
+    video_item = [m for m in mock_media_items if m.pk == 111][0]
+    expected_download_path = collection_dir / f"{video_item.pk}_new_download.mp4"
+
+    # Mock Path.glob to return empty list (no existing file)
+    mocker.patch('pathlib.Path.glob', return_value=[])
+    collection_dir.mkdir(parents=True, exist_ok=True)
+
+    # Mock successful download
+    mock_instagrapi_client.video_download.return_value = expected_download_path
+
+    with patch("builtins.open", MagicMock()) as mock_open, \
+         patch("json.dump", MagicMock()) as mock_json_dump:
+
+        result = download_collection_media(
+            client=mock_instagrapi_client,
+            media_items=[video_item],
+            collection_name=collection_name,
+            download_dir=download_dir
+        )
+
+    # Assertions
+    assert result is True
+    pathlib.Path.glob.assert_called_once_with(f"{video_item.pk}*")
+    # Download *should* be called
+    mock_instagrapi_client.video_download.assert_called_once_with(video_item.pk, folder=collection_dir)
+
+    # Check metadata reflects the newly downloaded file
+    expected_metadata = [
+        {
+            "relative_path": expected_download_path.name, # Name of the new file
+            "caption": video_item.caption_text,
+            "url": f"https://www.instagram.com/p/{video_item.code}/",
+            "pk": video_item.pk,
+            "media_type": video_item.media_type,
+            "product_type": video_item.product_type,
+        },
+    ]
+    mock_json_dump.assert_called_once_with(
+        expected_metadata, mock_open().__enter__(), indent=4, ensure_ascii=False
+    )

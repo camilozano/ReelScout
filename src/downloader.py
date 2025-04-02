@@ -56,7 +56,8 @@ def download_collection_media(
     metadata_list: List[Dict[str, Any]] = []
     total_items = len(media_items)
     download_count = 0
-    metadata_only_count = 0 # New counter for skipped downloads
+    metadata_only_count = 0 # Counter for --skip-download flag
+    skipped_exists_count = 0 # Counter for already existing files
     skipped_type_count = 0 # Counter for non-video types
     error_count = 0 # Counter for errors
 
@@ -75,11 +76,12 @@ def download_collection_media(
         # Always collect metadata regardless of download skip
         post_url = f"https://www.instagram.com/p/{media.code}/"
         caption = media.caption_text or ""
-        # Initialize relative_path as None, update if downloaded
+        # Initialize relative_path as None, update if downloaded or found existing
         relative_path_str: str | None = None
+        already_exists = False # Flag to track if file already exists
 
         item_metadata = {
-            "relative_path": relative_path_str, # Will be updated if downloaded
+            "relative_path": relative_path_str, # Will be updated if downloaded or found
             "caption": caption,
             "url": post_url,
             "pk": media.pk,
@@ -87,8 +89,19 @@ def download_collection_media(
             "product_type": media.product_type,
         }
 
-        # --- Conditional Download ---
-        if not skip_download:
+        # --- Check for Existing File ---
+        # Check if a file starting with the PK already exists in the directory
+        existing_files = list(collection_dir.glob(f"*{media.pk}*"))
+        if existing_files:
+            already_exists = True
+            found_path = existing_files[0] # Use the first match
+            relative_path_str = found_path.name
+            item_metadata["relative_path"] = relative_path_str
+            skipped_exists_count += 1
+            print(f"Skipped (already exists: {relative_path_str}).")
+            logger.info(f"Skipping download for PK {media.pk}, file already exists: {found_path}")
+        # --- Conditional Download (only if not skipping and not already existing) ---
+        elif not skip_download: # Note: Use elif here to avoid download attempt if already exists
             try:
                 logger.info(f"Attempting to download video for media PK: {media.pk}")
                 # Use video_download as it should handle reels/igtv too
@@ -97,10 +110,10 @@ def download_collection_media(
                 if download_path:
                     # Extract filename from the download path
                     try:
-                        # NEW LOGIC: Get only the filename
+                        # Get only the filename
                         filename = download_path.name
-                        filename_str = str(filename)
-                        item_metadata["relative_path"] = filename_str # Store filename in metadata
+                        relative_path_str = filename # Store Path object's name
+                        item_metadata["relative_path"] = relative_path_str # Store filename string in metadata
                         download_count += 1
                     except Exception as e: # Catch broader exceptions just in case .name fails unexpectedly
                         # Log the error and keep relative_path as None
@@ -111,10 +124,10 @@ def download_collection_media(
                         # The item_metadata will be added with relative_path=None
 
                     # Only print/log success if filename extraction succeeded
-                    if item_metadata.get("relative_path"):
+                    if relative_path_str:
                         # Update print/log messages to reflect filename storage
-                        print(f"Downloaded. Filename: {filename_str}")
-                        logger.info(f"Successfully downloaded video PK {media.pk} to {download_path}. Storing filename: {filename_str}")
+                        print(f"Downloaded. Filename: {relative_path_str}")
+                        logger.info(f"Successfully downloaded video PK {media.pk} to {download_path}. Storing filename: {relative_path_str}")
                     # If filename extraction failed, the error is already printed/logged above
                 else: # Corresponds to `if download_path:`
                     print("Download failed (no path returned).")
@@ -132,15 +145,17 @@ def download_collection_media(
         else:
             # Skip download flag is True
             print("Skipped download (metadata only).")
-            logger.info(f"Skipping video download for media PK: {media.pk} as requested.")
+            logger.info(f"Skipping video download for media PK: {media.pk} due to --skip-download flag.")
             metadata_only_count += 1
+        # Note: The 'already_exists' case is handled before this 'elif not skip_download' block
 
         # Append metadata regardless of download success/skip status
         metadata_list.append(item_metadata)
 
     print(f"\nCollection Summary for '{collection_name}':")
     print(f"  Successfully downloaded: {download_count}")
-    print(f"  Metadata only (skipped): {metadata_only_count}")
+    print(f"  Skipped (already exists):{skipped_exists_count}")
+    print(f"  Skipped (--skip-download):{metadata_only_count}")
     print(f"  Skipped (not video):     {skipped_type_count}")
     print(f"  Errors:                  {error_count}")
 

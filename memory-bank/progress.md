@@ -14,6 +14,7 @@
 *   Downloading video media items to a specified directory (`src/downloader.py`).
 *   Saving metadata (including relative path, caption, URL) for processed items to `metadata.json`.
 *   Option to skip video download and only collect metadata (`--skip-download` flag).
+*   **Downloader Idempotency (02 Apr 2025):** Checks if a video file matching the media PK already exists before downloading (`src/downloader.py`). Skips download if found, logs appropriately, and records the existing filename in metadata. Unit tested (`tests/test_downloader.py`).
 *   Basic Gemini text analysis (`src/ai_analyzer.py::analyze_caption_for_location`):
     *   Loads API key (`GEMINI_API_KEY`) from `auth/.env`.
     *   Uses `models/gemini-2.0-flash-exp` model (Updated 01 Apr 2025 from `models/gemini-1.5-pro-latest` per user request; originally fixed from `gemini-pro` 404 error).
@@ -57,6 +58,7 @@
 *   Dependency constraint: `pydantic` pinned to `2.10.1` due to `instagrapi` requirement.
 
 **Decision Log:**
+*   **02 Apr 2025:** Modified `src/downloader.py` to check for existing files using `Path.glob(f"{media.pk}*")` before downloading to prevent duplicates. Updated summary output and added unit tests for this behavior.
 *   **02 Apr 2025:** Modified `src/location_enricher.py` to use a two-step process: `find_place` to get `place_id`, then `place` to get details including the Google Maps URI ('url' field). Updated unit tests accordingly.
 *   **02 Apr 2025:** Fixed `ValueError` in `src/location_enricher.py` by removing the invalid 'url' field request from the Google Maps `find_place` API call and updated corresponding unit tests.
 *   **02 Apr 2025:** Added `googlemaps` library and implemented `src/location_enricher.py`. Integrated enrichment into the `analyze` CLI command to update `metadata.json` after AI analysis. Added unit tests for the enricher.

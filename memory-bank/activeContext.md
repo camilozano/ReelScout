@@ -5,6 +5,11 @@
 **Current Focus:** Implementing Gemini video analysis (Location enrichment via Google Maps is now integrated, fixed, and includes Google Maps URI).
 
 **Recent Changes:**
+*   **Downloader Idempotency (02 Apr 2025):**
+    *   Modified `src/downloader.py::download_collection_media` to check if a file starting with the media item's PK already exists in the target directory using `Path.glob(f"{media.pk}*")` before attempting download.
+    *   If an existing file is found, the download is skipped, a message is logged, and the existing filename is stored in the `relative_path` field of the metadata.
+    *   Added a counter (`skipped_exists_count`) and updated the summary output to reflect files skipped because they already existed.
+    *   Updated unit tests in `tests/test_downloader.py` to mock `Path.glob` and verify that `client.video_download` is skipped when a file exists and that the correct `relative_path` (existing or new) is recorded in the metadata.
 *   **Google Maps URI Added (02 Apr 2025):**
     *   Modified `src/location_enricher.py::enrich_location_data` to perform a second API call (`gmaps.place`) using the `place_id` obtained from the initial `gmaps.find_place` call.
     *   This second call specifically requests the 'url' field, which contains the Google Maps URI, along with other details.
