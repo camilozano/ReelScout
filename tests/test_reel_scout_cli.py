@@ -36,6 +36,7 @@ def mock_media_data():
 # Use patch context managers within the test function
 def test_collect_success_defaults(runner, mock_collections_data, mock_media_data):
     """Test successful run of 'collect' with default paths and user selects '1'."""
+    # No longer need to patch Path.exists as checks removed from click.Path
     with patch('reel_scout_cli.InstagramClient') as MockInstagramClient, \
          patch('reel_scout_cli.download_collection_media') as mock_download, \
          patch('click.prompt') as mock_prompt:
@@ -130,6 +131,7 @@ def test_collect_success_custom_paths(runner, mock_collections_data, mock_media_
 
 def test_collect_login_failure(runner):
     """Test CLI behavior when InstagramClient.login() fails."""
+    # No longer need to patch Path.exists
     with patch('reel_scout_cli.InstagramClient') as MockInstagramClient:
         mock_instance = MockInstagramClient.return_value
         mock_instance.login.return_value = False # Simulate login failure
@@ -143,6 +145,7 @@ def test_collect_login_failure(runner):
 
 def test_collect_get_collections_failure(runner):
     """Test CLI behavior when get_collections() fails."""
+    # No longer need to patch Path.exists
     with patch('reel_scout_cli.InstagramClient') as MockInstagramClient:
         mock_instance = MockInstagramClient.return_value
         mock_instance.login.return_value = True
@@ -158,6 +161,7 @@ def test_collect_get_collections_failure(runner):
 
 def test_collect_get_media_failure(runner, mock_collections_data):
     """Test CLI behavior when get_media_from_collection() fails."""
+    # No longer need to patch Path.exists
     with patch('reel_scout_cli.InstagramClient') as MockInstagramClient, \
          patch('click.prompt') as mock_prompt:
 
@@ -182,6 +186,7 @@ def test_collect_get_media_failure(runner, mock_collections_data):
 
 def test_collect_download_failure(runner, mock_collections_data, mock_media_data):
     """Test CLI behavior when download_collection_media() returns False."""
+    # No longer need to patch Path.exists
     with patch('reel_scout_cli.InstagramClient') as MockInstagramClient, \
          patch('reel_scout_cli.download_collection_media') as mock_download, \
          patch('click.prompt') as mock_prompt:

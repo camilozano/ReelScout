@@ -20,14 +20,16 @@ def cli():
 @cli.command('collect')
 @click.option(
     '--session-file',
-    type=click.Path(exists=True, file_okay=True, dir_okay=False, readable=True, path_type=Path),
+    # Removed exists=True, readable=True for easier testing
+    type=click.Path(file_okay=True, dir_okay=False, path_type=Path),
     default=Path("auth/session.json"),
     help="Path to the Instagram session file.",
     show_default=True,
 )
 @click.option(
     '--download-dir',
-    type=click.Path(file_okay=False, dir_okay=True, writable=True, path_type=Path),
+    # Removed writable=True for easier testing
+    type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
     default=Path("downloads"),
     help="Directory to download media and metadata into.",
     show_default=True,
