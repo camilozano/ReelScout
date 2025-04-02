@@ -4,6 +4,10 @@ ReelScout helps you rediscover the amazing places hidden in your saved Instagram
 
 Ever save tons of travel Reels but struggle to remember the specific restaurants, viewpoints, or hidden gems mentioned? ReelScout uses AI to automatically analyze your saved collections and extract location data, making trip planning or revisiting cool spots a breeze. 🌬️
 
+### Disclaimer
+This has all been vibe coded. Only part I've actually writen is the highlevel overview in `memory-bank/Plans.md`
+This has been made with Cline and Gemini 2.5 Pro
+
 ## 🎯 Core Aim
 
 This tool aims to:
