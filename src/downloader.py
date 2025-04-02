@@ -160,20 +160,3 @@ def download_collection_media(
         logger.error(f"Failed to serialize metadata to JSON: {e}")
         print(f"Error: Could not serialize metadata to JSON: {e}")
         return False
-
-# Example usage (for testing purposes, can be removed later)
-if __name__ == "__main__":
-    # This part requires a logged-in client and media_items,
-    # which are typically obtained from instagram_client.py
-    print("Downloader module - run reel_scout_cli.py for actual use.")
-    # Example structure (won't run without client/media):
-    # from instagram_client import InstagramClient
-    # logging.basicConfig(level=logging.INFO)
-    # insta_client = InstagramClient()
-    # if insta_client.login():
-    #     # Assume we got collections and selected one
-    #     collection_pk_to_test = 123456789 # Replace with a real PK if testing
-    #     collection_name_to_test = "Test Collection" # Replace
-    #     media = insta_client.get_media_from_collection(collection_pk_to_test)
-    #     if media:
-    #         download_collection_media(insta_client.client, media, collection_name_to_test)
