@@ -83,7 +83,7 @@ graph TD
 
 *   `reel_scout_cli.py`: Orchestrates the workflow, handles user input, and calls other modules.
 *   `src/instagram_client.py`: Handles authentication and interaction with the Instagram API via `instagrapi`. Fetches collection and media data.
-*   `src/downloader.py`: Downloads media files and saves initial metadata to `metadata.json`.
+*   `src/downloader.py`: Downloads media files (videos, photos, carousel resources) and saves initial metadata to `metadata.json`. Handles different media types: downloads videos/photos directly, downloads carousel resources into PK-named subdirectories. Checks for existing files/subdirs/resources to ensure idempotency.
 *   `src/ai_analyzer.py`: Handles interaction with the Google Gemini API. Contains function for text analysis (`analyze_caption_for_location`) and planned video analysis.
 *   `src/location_enricher.py`: Handles interaction with the Google Maps Places API via `googlemaps`. Contains function `enrich_location_data` to find place details based on a name.
 *   `Output Handler` (TBD): Currently, the final output (updated `metadata.json`) is handled directly within the `analyze` command in `reel_scout_cli.py`. A separate handler might be created later for different output formats (e.g., CSV).

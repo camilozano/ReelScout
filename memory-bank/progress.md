@@ -11,10 +11,18 @@
 *   Instagram login using session file (`src/instagram_client.py` with `instagrapi`).
 *   Fetching user's saved collections.
 *   Fetching media items within a selected collection.
-*   Downloading video media items to a specified directory (`src/downloader.py`).
-*   Saving metadata (including relative path, caption, URL) for processed items to `metadata.json`.
-*   Option to skip video download and only collect metadata (`--skip-download` flag).
-*   **Downloader Idempotency (02 Apr 2025):** Checks if a video file matching the media PK already exists before downloading (`src/downloader.py`). Skips download if found, logs appropriately, and records the existing filename in metadata. Unit tested (`tests/test_downloader.py`).
+*   **Downloading Media (19 Apr 2025):** Handles videos (`media_type=2`), photos (`media_type=1`), and carousels (`media_type=8`).
+    *   Downloads videos and photos directly into the collection directory.
+    *   For carousels, creates a subdirectory named after the carousel's PK and downloads individual photo/video resources into that subdirectory.
+    *   Saves metadata for all processed types (videos, photos, carousels) to `metadata.json`.
+    *   `relative_path` in metadata stores the filename for videos/photos, and the relative subdirectory path (e.g., `{pk}/`) for carousels.
+*   Option to skip media download and only collect metadata (`--skip-download` flag). Works for all types (videos, photos, carousels - creates carousel subdir even if skipping resource downloads).
+*   **Downloader Idempotency (Updated 19 Apr 2025):**
+    *   Checks if a video/photo file matching the media PK already exists before downloading.
+    *   Checks if a carousel subdirectory exists and is non-empty before processing resources.
+    *   Checks if individual carousel resource files exist before downloading them.
+    *   Skips download if item/resource already exists, logs appropriately, and records the existing filename/subdir path in metadata.
+    *   Unit tested (`tests/test_downloader.py`) for all media types and skip scenarios.
 *   Basic Gemini text analysis (`src/ai_analyzer.py::analyze_caption_for_location`):
     *   Loads API key (`GEMINI_API_KEY`) from `auth/.env`.
     *   Uses `models/gemini-2.0-flash-exp` model (Updated 01 Apr 2025 from `models/gemini-1.5-pro-latest` per user request; originally fixed from `gemini-pro` 404 error).
@@ -45,9 +53,10 @@
     *   More robust error handling for AI analysis and Google Maps enrichment (API limits, content filtering, etc.).
     *   Enhanced logging.
     *   *Optional:* Integration tests for AI analyzer and location enricher (hitting live APIs).
-    *   Potentially handle non-video media types differently if needed later.
+    *   Potentially handle non-video media types differently if needed later. **(Addressed 19 Apr 2025)**
 
 **Known Issues:**
+*   **FIXED (19 Apr 2025):** Downloader previously only handled video (`media_type=2`), ignoring photos and carousels. Now handles all three types.
 *   **FIXED (01 Apr 2025):** Pytest failure in `test_collect_success_custom_paths` due to `click.Path` validation checks failing before patches were active. Fixed by creating the temporary file/directory directly in the test setup instead of patching `os` functions.
 *   **FIXED (01 Apr 2025):** `ValueError` during relative path calculation in `src/downloader.py` due to comparing absolute download path with relative base directory path. Fixed by resolving the base path to absolute in `reel_scout_cli.py`.
 *   **FIXED (01 Apr 2025):** Gemini API call failed with 404 error for `gemini-pro` and `gemini-1.0-pro` models. Fixed by using `genai.list_models()` to find an available model (`models/gemini-1.5-pro-latest`) and updating `src/ai_analyzer.py`.
@@ -58,8 +67,9 @@
 *   Dependency constraint: `pydantic` pinned to `2.10.1` due to `instagrapi` requirement.
 
 **Decision Log:**
+*   **19 Apr 2025:** Modified `src/downloader.py` and `tests/test_downloader.py` to handle photos (`media_type=1`) and carousels (`media_type=8`) alongside videos (`media_type=2`). Carousels now download resources into a PK-named subdirectory. Updated Memory Bank files (`activeContext.md`, `progress.md`, `systemPatterns.md`).
 *   **19 Apr 2025:** Migrated from `google-generativeai` to `google-genai` library due to deprecation. Updated dependencies (`pyproject.toml`), refactored AI analyzer (`src/ai_analyzer.py`) for new client/types/errors/response handling, updated unit tests (`tests/test_ai_analyzer.py`), and updated relevant Memory Bank files (`techContext.md`, `activeContext.md`, `progress.md`).
-*   **02 Apr 2025:** Modified `src/downloader.py` to check for existing files using `Path.glob(f"{media.pk}*")` before downloading to prevent duplicates. Updated summary output and added unit tests for this behavior.
+*   **02 Apr 2025:** Modified `src/downloader.py` to check for existing *video* files using `Path.glob(f"{media.pk}*")` before downloading to prevent duplicates. Updated summary output and added unit tests for this behavior. *(Superseded by 19 Apr 2025 update for all types)*.
 *   **02 Apr 2025:** Modified `src/location_enricher.py` to use a two-step process: `find_place` to get `place_id`, then `place` to get details including the Google Maps URI ('url' field). Updated unit tests accordingly.
 *   **02 Apr 2025:** Fixed `ValueError` in `src/location_enricher.py` by removing the invalid 'url' field request from the Google Maps `find_place` API call and updated corresponding unit tests.
 *   **02 Apr 2025:** Added `googlemaps` library and implemented `src/location_enricher.py`. Integrated enrichment into the `analyze` CLI command to update `metadata.json` after AI analysis. Added unit tests for the enricher.
