@@ -6,7 +6,7 @@
 
 **What Works:**
 *   Memory Bank structure established and populated.
-*   Dependency management using Poetry (`pyproject.toml`), including `google-generativeai` and `python-dotenv`.
+*   Dependency management using Poetry (`pyproject.toml`), including `google-genai` and `python-dotenv`. **Updated (19 Apr 2025):** Migrated from `google-generativeai`.
 *   Installable CLI (`reel-scout`) via Poetry script configuration, using `click`.
 *   Instagram login using session file (`src/instagram_client.py` with `instagrapi`).
 *   Fetching user's saved collections.
@@ -58,6 +58,7 @@
 *   Dependency constraint: `pydantic` pinned to `2.10.1` due to `instagrapi` requirement.
 
 **Decision Log:**
+*   **19 Apr 2025:** Migrated from `google-generativeai` to `google-genai` library due to deprecation. Updated dependencies (`pyproject.toml`), refactored AI analyzer (`src/ai_analyzer.py`) for new client/types/errors/response handling, updated unit tests (`tests/test_ai_analyzer.py`), and updated relevant Memory Bank files (`techContext.md`, `activeContext.md`, `progress.md`).
 *   **02 Apr 2025:** Modified `src/downloader.py` to check for existing files using `Path.glob(f"{media.pk}*")` before downloading to prevent duplicates. Updated summary output and added unit tests for this behavior.
 *   **02 Apr 2025:** Modified `src/location_enricher.py` to use a two-step process: `find_place` to get `place_id`, then `place` to get details including the Google Maps URI ('url' field). Updated unit tests accordingly.
 *   **02 Apr 2025:** Fixed `ValueError` in `src/location_enricher.py` by removing the invalid 'url' field request from the Google Maps `find_place` API call and updated corresponding unit tests.

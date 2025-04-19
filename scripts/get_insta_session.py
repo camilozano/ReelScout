@@ -12,7 +12,7 @@ from instagrapi.exceptions import (
 
 # Define the directory and file path for saving the session
 AUTH_DIR = Path("auth")
-SESSION_FILE = AUTH_DIR / "instagram_session.json"
+SESSION_FILE = AUTH_DIR / "session.json"
 
 def get_instagram_session():
     """

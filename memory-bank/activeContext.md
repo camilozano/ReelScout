@@ -2,9 +2,18 @@
 
 *(This document tracks the current focus, recent changes, next steps, active decisions, patterns, and learnings.)*
 
-**Current Focus:** Implementing Gemini video analysis (Location enrichment via Google Maps is now integrated, fixed, and includes Google Maps URI). Pytest setup is now stable.
+**Current Focus:** Implementing Gemini video analysis. Migration to `google-genai` library complete.
 
 **Recent Changes:**
+*   **Gemini SDK Migration (19 Apr 2025):** Migrated from the deprecated `google-generativeai` library to the new `google-genai` library.
+    *   Updated `pyproject.toml` dependencies using Poetry.
+    *   Refactored `src/ai_analyzer.py` to use the new client initialization (`genai.Client`), `types`, `errors`, and response handling (`response.text` with Pydantic validation). Removed global `genai.configure`.
+    *   Updated `tests/test_ai_analyzer.py` to mock the new client structure (`genai.Client`, `client.models.generate_content`) and use the new error types (`google.genai.errors`). Adjusted tests for the new response handling flow.
+    *   Updated `memory-bank/techContext.md`, `memory-bank/activeContext.md`, and `memory-bank/progress.md` to reflect the library change.
+*   **Collect Skip Download Flag (19 Apr 2025):** Added a `--skip-download` flag to the `reel-scout collect` command.
+    *   Modified `reel_scout_cli.py` to include the `click.option` for the flag and pass it to the downloader.
+    *   Modified `src/downloader.py::download_collection_media` to accept the `skip_download` boolean parameter. If `True`, the function skips the actual video download (`client.video_download`) but still collects all metadata, setting `relative_path` to `None`. Updated summary counts.
+    *   Added unit test `test_download_skip_download_flag_no_existing_file` to `tests/test_downloader.py` to verify the flag's functionality when no pre-existing file is found. Verified existing tests related to file skipping still pass.
 *   **Pytest Env Var Fix (02 Apr 2025):** Resolved `pytest` collection errors (`ValueError: GEMINI_API_KEY not found...`) and subsequent `ScopeMismatch` errors. Created `tests/conftest.py` with a session-scoped, autouse fixture (`set_env_vars_session_scope`) that uses `os.environ` to set dummy `GEMINI_API_KEY` and `GOOGLE_PLACES_API` variables before tests are collected. This prevents import-time errors in modules checking for these variables.
 *   **Downloader Test Fix (02 Apr 2025):** Fixed failing tests (`test_download_skip_existing_file`, `test_download_existing_file_with_skip_download_flag`, `test_download_no_existing_file_proceeds`) in `tests/test_downloader.py`. The issue was an incorrect glob pattern (`*{media.pk}*` instead of `{media.pk}*`) used in `src/downloader.py` to check for existing files. Corrected the pattern and verified all tests pass.
 *   **Downloader Idempotency (02 Apr 2025):**
@@ -58,7 +67,7 @@
 *   Using `pathlib` for path manipulation.
 *   Using `click` for the command-line interface.
 *   Using `instagrapi` for Instagram interaction.
-*   Using `google-generativeai` for Gemini interaction.
+*   Using `google-genai` for Gemini interaction. **Updated (19 Apr 2025):** Migrated from `google-generativeai`.
 *   Using `googlemaps` for Google Maps interaction.
 *   Using `pydantic` for data validation and schema definition (especially with Gemini JSON mode).
 *   Using `python-dotenv` for loading environment variables.

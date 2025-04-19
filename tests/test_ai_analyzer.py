@@ -1,117 +1,122 @@
 import pytest
 import json
-from unittest.mock import Mock, MagicMock # Use MagicMock for attribute access like .parsed
-import google.generativeai as genai
-from google.api_core import exceptions as google_exceptions
+from unittest.mock import Mock, MagicMock, patch
+# Import new SDK parts
+from google.genai import types, errors
 from pydantic import ValidationError
 
 # Import the class and Pydantic model to test
 from src.ai_analyzer import AIAnalyzer, LocationResponse
 
 # Define the path to the class/methods we need to mock
-GENERATIVE_MODEL_MOCK_PATH = "src.ai_analyzer.genai.GenerativeModel"
-CONFIGURE_MOCK_PATH = "src.ai_analyzer.genai.configure" # Mock configure to avoid real API key needs
+# We now mock the Client class and its instance methods
+CLIENT_MOCK_PATH = "src.ai_analyzer.genai.Client"
 OS_GETENV_MOCK_PATH = "src.ai_analyzer.os.getenv"
 LOAD_DOTENV_MOCK_PATH = "src.ai_analyzer.load_dotenv"
+# Path for mocking the Pydantic validation method if needed
+PYDANTIC_VALIDATE_JSON_MOCK_PATH = "src.ai_analyzer.LocationResponse.model_validate_json"
 
 
 # --- Test Fixtures ---
 @pytest.fixture
-def mock_generative_model(mocker):
-    """Fixture to mock the genai.GenerativeModel class."""
-    mock_model_instance = MagicMock() # Mock the instance that GenerativeModel() returns
-    mock_model_class = mocker.patch(GENERATIVE_MODEL_MOCK_PATH, return_value=mock_model_instance)
-    return mock_model_instance # Return the instance for configuring generate_content
+def mock_genai_client(mocker):
+    """Fixture to mock the genai.Client class and its relevant methods."""
+    # Mock the Client class itself
+    mock_client_class = mocker.patch(CLIENT_MOCK_PATH, autospec=True)
+    # Mock the instance that Client() returns
+    mock_client_instance = mock_client_class.return_value
+    # Mock the nested 'models.generate_content' method on the instance
+    # Use MagicMock for attribute chaining (models.generate_content)
+    mock_client_instance.models = MagicMock()
+    mock_client_instance.models.generate_content = MagicMock()
+    return mock_client_instance # Return the mocked client instance
 
 @pytest.fixture
 def mock_environment(mocker):
-    """Fixture to mock environment functions (getenv, load_dotenv, configure)."""
-    mocker.patch(CONFIGURE_MOCK_PATH) # Mock configure to do nothing
+    """Fixture to mock environment functions (getenv, load_dotenv)."""
+    # configure is no longer used
     mocker.patch(OS_GETENV_MOCK_PATH, return_value="DUMMY_API_KEY") # Provide a dummy key
     mocker.patch(LOAD_DOTENV_MOCK_PATH) # Mock load_dotenv to do nothing
 
 # --- Test Cases ---
 
-def test_analyze_caption_success_locations_found_parsed(mock_environment, mock_generative_model):
-    """Tests successful analysis with locations found via response.parsed."""
+def test_analyze_caption_success_locations_found(mock_environment, mock_genai_client):
+    """Tests successful analysis with locations found via Pydantic validation."""
     caption = "Amazing view from the Eiffel Tower!"
     expected_locations = ["Eiffel Tower"]
-    expected_result = {"location_found": True, "locations": expected_locations}
+    # Expected result after model_dump()
+    expected_dict_result = {"location_found": True, "locations": expected_locations}
+    raw_json_text = json.dumps(expected_dict_result)
 
-    # Create a mock response object with a .parsed attribute
-    mock_response = MagicMock()
-    mock_response.parsed = LocationResponse(location_found=True, locations=expected_locations)
-    # We don't strictly need .text if .parsed works, but good practice to have it
-    mock_response.text = json.dumps(expected_result)
-
-    # Configure the mock instance's generate_content method
-    mock_generative_model.generate_content.return_value = mock_response
+    # Create a mock response object with only the .text attribute
+    mock_response = Mock()
+    mock_response.text = raw_json_text
+    # Configure the mock client's generate_content method
+    mock_genai_client.models.generate_content.return_value = mock_response
 
     # Instantiate the class (mocks are active via fixtures)
     analyzer = AIAnalyzer()
     result = analyzer.analyze_caption_for_location(caption)
 
-    assert result == expected_result
-    mock_generative_model.generate_content.assert_called_once()
-    # Optional: Assert prompt contains caption
-    assert caption in mock_generative_model.generate_content.call_args[0][0]
+    assert result == expected_dict_result
+    mock_genai_client.models.generate_content.assert_called_once()
+    # Check arguments passed to generate_content
+    call_args, call_kwargs = mock_genai_client.models.generate_content.call_args
+    assert call_kwargs['model'] == analyzer.model_name
+    assert caption in call_kwargs['contents']
+    assert isinstance(call_kwargs['config'], types.GenerateContentConfig)
+    assert call_kwargs['config'].response_mime_type == "application/json"
+    assert call_kwargs['config'].response_schema == LocationResponse
 
-def test_analyze_caption_success_no_locations_found_parsed(mock_environment, mock_generative_model):
-    """Tests successful analysis with no locations found via response.parsed."""
+def test_analyze_caption_success_no_locations_found(mock_environment, mock_genai_client):
+    """Tests successful analysis with no locations found via Pydantic validation."""
     caption = "Just a random thought."
-    expected_result = {"location_found": False, "locations": None}
+    expected_dict_result = {"location_found": False, "locations": None}
+    raw_json_text = json.dumps(expected_dict_result)
 
-    mock_response = MagicMock()
-    mock_response.parsed = LocationResponse(location_found=False, locations=None)
-    mock_response.text = json.dumps(expected_result)
-
-    mock_generative_model.generate_content.return_value = mock_response
-
-    analyzer = AIAnalyzer()
-    result = analyzer.analyze_caption_for_location(caption)
-
-    assert result == expected_result
-    mock_generative_model.generate_content.assert_called_once()
-
-def test_analyze_caption_success_locations_found_fallback(mock_environment, mock_generative_model):
-    """Tests successful analysis with locations found via fallback JSON parsing."""
-    caption = "Dinner at Joe's Pizza."
-    expected_locations = ["Joe's Pizza"]
-    expected_result = {"location_found": True, "locations": expected_locations}
-    raw_json_text = json.dumps(expected_result)
-
-    # Simulate response.parsed being absent or None
-    mock_response = MagicMock()
-    mock_response.parsed = None # Or del mock_response.parsed
+    mock_response = Mock()
     mock_response.text = raw_json_text
-
-    mock_generative_model.generate_content.return_value = mock_response
+    mock_genai_client.models.generate_content.return_value = mock_response
 
     analyzer = AIAnalyzer()
     result = analyzer.analyze_caption_for_location(caption)
 
-    assert result == expected_result
-    mock_generative_model.generate_content.assert_called_once()
+    assert result == expected_dict_result
+    mock_genai_client.models.generate_content.assert_called_once()
 
-def test_analyze_caption_success_no_locations_found_fallback(mock_environment, mock_generative_model):
-    """Tests successful analysis with no locations found via fallback JSON parsing."""
-    caption = "Another day at the office."
-    expected_result = {"location_found": False, "locations": None}
-    raw_json_text = json.dumps(expected_result)
+# The concept of a separate "fallback" path is less distinct now,
+# as Pydantic validation is the primary path. We test validation errors instead.
 
-    mock_response = MagicMock()
-    mock_response.parsed = None
+def test_analyze_caption_pydantic_validation_error_fallback_success(mocker, mock_environment, mock_genai_client):
+    """Tests fallback JSON parsing when Pydantic validation fails but JSON is valid."""
+    caption = "Caption causing validation error but valid JSON."
+    # This JSON is valid but doesn't match LocationResponse schema (missing location_found)
+    mismatched_json_dict = {"locations": ["Place"]}
+    raw_json_text = json.dumps(mismatched_json_dict)
+    validation_error_message = "Field required [type=missing, input_value={'locations': ['Place']}, input_type=dict]"
+
+    # Mock Pydantic validation to raise an error
+    mock_validate = mocker.patch(PYDANTIC_VALIDATE_JSON_MOCK_PATH)
+    mock_validate.side_effect = ValidationError.from_exception_data(
+        title='LocationResponse', line_errors=[{'input': mismatched_json_dict, 'loc': ('location_found',), 'type': 'missing'}]
+    )
+
+    mock_response = Mock()
     mock_response.text = raw_json_text
-
-    mock_generative_model.generate_content.return_value = mock_response
+    mock_genai_client.models.generate_content.return_value = mock_response
 
     analyzer = AIAnalyzer()
     result = analyzer.analyze_caption_for_location(caption)
 
-    assert result == expected_result
-    mock_generative_model.generate_content.assert_called_once()
+    # Expect the fallback data, plus the added error key
+    expected_result_with_error = mismatched_json_dict.copy()
+    expected_result_with_error["error"] = f"Pydantic validation failed: {mock_validate.side_effect}"
 
-def test_analyze_caption_empty_input(mock_environment, mock_generative_model):
+    assert result == expected_result_with_error
+    mock_genai_client.models.generate_content.assert_called_once()
+    mock_validate.assert_called_once_with(raw_json_text) # Ensure validation was attempted
+
+def test_analyze_caption_empty_input(mock_environment, mock_genai_client):
     """Tests handling of an empty input caption."""
     caption = ""
     expected_result = {"location_found": False, "locations": None, "error": "Empty caption provided"}
@@ -120,15 +125,20 @@ def test_analyze_caption_empty_input(mock_environment, mock_generative_model):
     result = analyzer.analyze_caption_for_location(caption)
 
     assert result == expected_result
-    mock_generative_model.generate_content.assert_not_called() # API should not be called
+    mock_genai_client.models.generate_content.assert_not_called() # API should not be called
 
-def test_analyze_caption_api_error(mock_environment, mock_generative_model):
-    """Tests handling of a Gemini API call error."""
+def test_analyze_caption_api_error(mock_environment, mock_genai_client):
+    """Tests handling of a Gemini API call error using the new SDK's error type."""
     caption = "This caption will cause an error."
     error_message = "API rate limit exceeded"
-    # Simulate an API error
-    mock_generative_model.generate_content.side_effect = Exception(error_message)
+    dummy_response_json = {"error": {"message": error_message, "status": "PERMISSION_DENIED"}}
+    # Simulate an API error: pass message positionally, response_json as keyword
+    mock_genai_client.models.generate_content.side_effect = errors.APIError(
+        error_message, # Positional argument (assuming it's the message)
+        response_json=dummy_response_json # Keyword argument
+    )
 
+    # The str(e) in the main code should include the message
     expected_error_fragment = f"Gemini API call failed: {error_message}"
 
     analyzer = AIAnalyzer()
@@ -138,122 +148,25 @@ def test_analyze_caption_api_error(mock_environment, mock_generative_model):
     assert result["locations"] is None
     assert "error" in result
     assert expected_error_fragment in result["error"]
-    mock_generative_model.generate_content.assert_called_once()
+    mock_genai_client.models.generate_content.assert_called_once()
 
-def test_analyze_caption_fallback_json_decode_error(mock_environment, mock_generative_model):
-    """Tests handling of invalid JSON in the fallback parsing path."""
+def test_analyze_caption_json_decode_error(mocker, mock_environment, mock_genai_client):
+    """Tests handling of invalid JSON response from the API."""
     caption = "Caption leading to bad JSON."
     invalid_json_text = '{"location_found": true, "locations": ["Place"]' # Missing closing brace
 
-    mock_response = MagicMock()
-    mock_response.parsed = None
+    # Mock Pydantic validation to raise JSONDecodeError when called
+    # (Simulates Pydantic trying to parse invalid JSON)
+    mock_validate = mocker.patch(PYDANTIC_VALIDATE_JSON_MOCK_PATH)
+    # The actual error comes from json.loads inside model_validate_json
+    mock_validate.side_effect = json.JSONDecodeError("Expecting property name enclosed in double quotes", invalid_json_text, 0)
+
+    mock_response = Mock()
     mock_response.text = invalid_json_text
+    mock_genai_client.models.generate_content.return_value = mock_response
 
-    mock_generative_model.generate_content.return_value = mock_response
-
-    expected_error_fragment = "Failed to parse fallback JSON response from AI"
-
-    analyzer = AIAnalyzer()
-    result = analyzer.analyze_caption_for_location(caption)
-
-    assert result["location_found"] is False
-    assert result["locations"] is None
-    assert "error" in result
-    assert expected_error_fragment in result["error"]
-    assert "raw_response" in result
-    assert result["raw_response"] == invalid_json_text
-    mock_generative_model.generate_content.assert_called_once()
-
-def test_analyze_caption_fallback_invalid_structure(mock_environment, mock_generative_model):
-    """Tests handling of valid JSON with incorrect structure in fallback."""
-    caption = "Caption leading to wrong structure."
-    wrong_structure_json = json.dumps({"name": "Eiffel Tower", "city": "Paris"})
-
-    mock_response = MagicMock()
-    mock_response.parsed = None
-    mock_response.text = wrong_structure_json
-
-    mock_generative_model.generate_content.return_value = mock_response
-
-    expected_error_fragment = "Invalid structure in fallback JSON"
-
-    analyzer = AIAnalyzer()
-    result = analyzer.analyze_caption_for_location(caption)
-
-    assert result["location_found"] is False
-    assert result["locations"] is None
-    assert "error" in result
-    assert expected_error_fragment in result["error"]
-    assert "raw_response" in result
-    assert result["raw_response"] == wrong_structure_json
-    mock_generative_model.generate_content.assert_called_once()
-
-def test_analyze_caption_fallback_invalid_locations_format(mock_environment, mock_generative_model):
-    """Tests handling of fallback JSON with invalid 'locations' field type."""
-    caption = "Caption leading to bad locations type."
-    # 'locations' should be a list or None, not a string
-    bad_locations_json = json.dumps({"location_found": True, "locations": "Eiffel Tower"})
-
-    mock_response = MagicMock()
-    mock_response.parsed = None
-    mock_response.text = bad_locations_json
-
-    mock_generative_model.generate_content.return_value = mock_response
-
-    expected_error_fragment = "Invalid 'locations' format in fallback JSON"
-
-    analyzer = AIAnalyzer()
-    result = analyzer.analyze_caption_for_location(caption)
-
-    assert result["location_found"] is False
-    assert result["locations"] is None
-    assert "error" in result
-    assert expected_error_fragment in result["error"]
-    assert "raw_response" in result
-    assert result["raw_response"] == bad_locations_json
-    mock_generative_model.generate_content.assert_called_once()
-
-def test_analyze_caption_processing_error_after_api_call(mock_environment, mock_generative_model):
-    """Tests handling of an unexpected error during response processing (after API call)."""
-    caption = "Caption causing processing error."
-    # Ensure comma is present in expected_result
-    expected_result = {"location_found": True, "locations": ["Some Place"]} # Added comma here
-    raw_json_text = json.dumps(expected_result)
-
-    # Simulate response.parsed exists, but calling model_dump on it causes an error
-    mock_response = MagicMock()
-    # Create a mock for the parsed object
-    mock_parsed_object = Mock()
-    # Make its model_dump method raise an error
-    mock_parsed_object.model_dump.side_effect = AttributeError("Simulated model_dump error")
-    # Assign this mock to the parsed attribute
-    mock_response.parsed = mock_parsed_object
-    mock_response.text = raw_json_text # Provide valid fallback text
-
-    mock_generative_model.generate_content.return_value = mock_response
-
-    analyzer = AIAnalyzer()
-    # Even though .parsed fails, the fallback should succeed here
-    result = analyzer.analyze_caption_for_location(caption)
-
-    # Check that fallback parsing worked despite the initial error
-    assert result == expected_result
-    mock_generative_model.generate_content.assert_called_once()
-
-def test_analyze_caption_processing_error_and_fallback_fails(mock_environment, mock_generative_model):
-    """Tests handling of processing error AND fallback JSON error."""
-    caption = "Caption causing double error."
-    invalid_json_text = '{"bad": json'
-
-    # Simulate response.parsed being None and fallback text being invalid JSON
-    mock_response = MagicMock()
-    mock_response.parsed = None # Set parsed to None
-    mock_response.text = invalid_json_text # Provide invalid fallback text
-
-    mock_generative_model.generate_content.return_value = mock_response
-
-    # Expect the error from the json.JSONDecodeError block in the source code
-    expected_error_fragment = "Failed to parse fallback JSON response from AI"
+    # The error should be caught by the first `except json.JSONDecodeError` block
+    expected_error_fragment = "Failed to decode JSON response from AI" # Updated expected message
 
     analyzer = AIAnalyzer()
     result = analyzer.analyze_caption_for_location(caption)
@@ -264,14 +177,53 @@ def test_analyze_caption_processing_error_and_fallback_fails(mock_environment, m
     assert expected_error_fragment in result["error"]
     assert "raw_response" in result
     assert result["raw_response"] == invalid_json_text
-    mock_generative_model.generate_content.assert_called_once()
+    mock_genai_client.models.generate_content.assert_called_once()
+    mock_validate.assert_called_once_with(invalid_json_text) # Ensure validation was attempted
 
-# --- Tests for __init__ ---
+# Removed tests specifically for fallback structure/format errors, as these
+# are now handled by the Pydantic validation error path.
+
+# Removed test_analyze_caption_processing_error_after_api_call as the .parsed
+# attribute is gone, simplifying the flow.
+
+def test_analyze_caption_unexpected_error_during_processing(mocker, mock_environment, mock_genai_client):
+    """Tests handling of an unexpected error during response processing."""
+    caption = "Caption causing unexpected processing error."
+    valid_json_dict = {"location_found": True, "locations": ["Place"]}
+    raw_json_text = json.dumps(valid_json_dict)
+    error_message = "Something broke!"
+
+    # Mock Pydantic validation to raise an unexpected error
+    mock_validate = mocker.patch(PYDANTIC_VALIDATE_JSON_MOCK_PATH)
+    mock_validate.side_effect = RuntimeError(error_message)
+
+    mock_response = Mock()
+    mock_response.text = raw_json_text
+    mock_genai_client.models.generate_content.return_value = mock_response
+
+    # Expect the error from the `except Exception as e:` block within the response processing try block
+    expected_error_fragment = f"Unexpected error processing response: {error_message}" # Updated expected message
+
+    analyzer = AIAnalyzer()
+    result = analyzer.analyze_caption_for_location(caption)
+
+    assert result["location_found"] is False
+    assert result["locations"] is None
+    assert "error" in result
+    assert expected_error_fragment in result["error"]
+    assert "raw_response" in result
+    assert result["raw_response"] == raw_json_text
+    mock_genai_client.models.generate_content.assert_called_once()
+    mock_validate.assert_called_once_with(raw_json_text)
+
+
+# --- Tests for __init__ (Simplified as client/model are not created here anymore) ---
+
+# Keep tests for API key loading logic
 
 def test_analyzer_init_with_api_key(mocker):
     """Tests initialization with an explicitly provided API key."""
-    mock_configure = mocker.patch(CONFIGURE_MOCK_PATH)
-    mock_model_class = mocker.patch(GENERATIVE_MODEL_MOCK_PATH)
+    # No need to mock genai Client or configure anymore for init
     mock_getenv = mocker.patch(OS_GETENV_MOCK_PATH)
     mock_loadenv = mocker.patch(LOAD_DOTENV_MOCK_PATH)
 
@@ -281,15 +233,11 @@ def test_analyzer_init_with_api_key(mocker):
 
     assert analyzer.api_key == test_key
     assert analyzer.model_name == test_model
-    mock_configure.assert_called_once_with(api_key=test_key)
-    mock_model_class.assert_called_once_with(test_model)
     mock_getenv.assert_not_called() # Should not be called if key is provided
     mock_loadenv.assert_not_called()
 
 def test_analyzer_init_from_env_variable(mocker):
     """Tests initialization using an environment variable for the API key."""
-    mock_configure = mocker.patch(CONFIGURE_MOCK_PATH)
-    mock_model_class = mocker.patch(GENERATIVE_MODEL_MOCK_PATH)
     mock_getenv = mocker.patch(OS_GETENV_MOCK_PATH, return_value="env_key_456")
     mock_loadenv = mocker.patch(LOAD_DOTENV_MOCK_PATH)
 
@@ -297,15 +245,11 @@ def test_analyzer_init_from_env_variable(mocker):
 
     assert analyzer.api_key == "env_key_456"
     assert analyzer.model_name == AIAnalyzer.DEFAULT_MODEL_NAME # Check default model
-    mock_configure.assert_called_once_with(api_key="env_key_456")
-    mock_model_class.assert_called_once_with(AIAnalyzer.DEFAULT_MODEL_NAME)
     mock_getenv.assert_called_once_with("GEMINI_API_KEY")
     mock_loadenv.assert_not_called() # Should not be called if env var is found
 
 def test_analyzer_init_from_dotenv_file(mocker):
     """Tests initialization loading the API key from a .env file."""
-    mock_configure = mocker.patch(CONFIGURE_MOCK_PATH)
-    mock_model_class = mocker.patch(GENERATIVE_MODEL_MOCK_PATH)
     # Simulate getenv failing first, then succeeding after load_dotenv
     mock_getenv = mocker.patch(OS_GETENV_MOCK_PATH, side_effect=[None, "dotenv_key_789"])
     mock_loadenv = mocker.patch(LOAD_DOTENV_MOCK_PATH) # Mock load_dotenv itself
@@ -313,15 +257,12 @@ def test_analyzer_init_from_dotenv_file(mocker):
     analyzer = AIAnalyzer()
 
     assert analyzer.api_key == "dotenv_key_789"
-    mock_configure.assert_called_once_with(api_key="dotenv_key_789")
-    mock_model_class.assert_called_once_with(AIAnalyzer.DEFAULT_MODEL_NAME)
+    assert analyzer.model_name == AIAnalyzer.DEFAULT_MODEL_NAME
     assert mock_getenv.call_count == 2 # Called before and after load_dotenv
     mock_loadenv.assert_called_once() # load_dotenv should be called
 
 def test_analyzer_init_no_api_key_found(mocker):
     """Tests that ValueError is raised if no API key can be found."""
-    mock_configure = mocker.patch(CONFIGURE_MOCK_PATH)
-    mock_model_class = mocker.patch(GENERATIVE_MODEL_MOCK_PATH)
     mock_getenv = mocker.patch(OS_GETENV_MOCK_PATH, return_value=None) # Simulate getenv always failing
     mock_loadenv = mocker.patch(LOAD_DOTENV_MOCK_PATH)
 
@@ -330,5 +271,3 @@ def test_analyzer_init_no_api_key_found(mocker):
 
     assert mock_getenv.call_count == 2
     mock_loadenv.assert_called_once()
-    mock_configure.assert_not_called() # Configure shouldn't be called if init fails
-    mock_model_class.assert_not_called()

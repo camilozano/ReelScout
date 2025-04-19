@@ -1,4 +1,5 @@
-import google.generativeai as genai
+from google import genai
+from google.genai import types, errors # Added types and errors
 import os
 import json
 from dotenv import load_dotenv
@@ -20,7 +21,8 @@ class AIAnalyzer:
         model_name (str): The name of the Gemini model to use.
         model (genai.GenerativeModel): The initialized Gemini model instance.
     """
-    DEFAULT_MODEL_NAME = 'models/gemini-2.0-flash-lite'
+    #DEFAULT_MODEL_NAME = 'models/gemini-2.0-flash-lite'
+    DEFAULT_MODEL_NAME = 'models/gemini-2.5-flash-preview-04-17'
 
     def __init__(self, api_key: Optional[str] = None, model_name: Optional[str] = None):
         """
@@ -48,12 +50,11 @@ class AIAnalyzer:
             if not self.api_key:
                 raise ValueError("GEMINI_API_KEY not found. Ensure it is set in the environment or in auth/.env file.")
 
-        # Configure the genai library with the determined API key
-        genai.configure(api_key=self.api_key)
+        # API key loading logic remains the same
 
         self.model_name = model_name if model_name else self.DEFAULT_MODEL_NAME
-        self.model = genai.GenerativeModel(self.model_name)
-        print(f"AIAnalyzer initialized with model: {self.model_name}") # Added for confirmation
+        # Removed model initialization here, client is instantiated per-call now
+        print(f"AIAnalyzer configured with model name: {self.model_name}") # Updated print message
 
     def analyze_caption_for_location(self, caption: str) -> Dict[str, Any]:
         """
@@ -84,70 +85,69 @@ Do not include general areas as individual items in the list, include them as pa
 Caption:
 "{caption}"
 """
+        # Instantiate client here using the API key
+        client = genai.Client(api_key=self.api_key)
 
         try:
-            # Configure the model for JSON output with the defined schema
-            response = self.model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
+            # Configure the model for JSON output with the defined schema using the new client and types
+            response = client.models.generate_content(
+                model=self.model_name, # Pass model name here
+                contents=prompt,       # Use 'contents' instead of positional argument
+                config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     response_schema=LocationResponse,
+                    # Add other config like temperature if needed, e.g., temperature=0.5
                 )
             )
 
-            # The SDK should parse the JSON response automatically when a schema is provided.
-            # Note: Pydantic validation errors are suppressed by the SDK currently.
-            # We attempt to access the parsed object, falling back to manual parsing if needed.
+            # New SDK primarily uses response.text. We need to parse it ourselves.
+            # Use Pydantic for validation.
             try:
-                # Access the parsed Pydantic model instance
-                # Note: response.parsed might not exist or be None if parsing/validation failed silently
-                 if hasattr(response, 'parsed') and response.parsed:
-                      # Convert Pydantic model to dict for consistent return type
-                     parsed_data = response.parsed.model_dump() # Use model_dump() for Pydantic v2
-                     print(f"\n--- Parsed Locations (Pydantic): {parsed_data.get('locations')} ---") # ADDED PRINT
-                     return parsed_data
-                 else:
-                     # Fallback: Manually parse the text if .parsed is not available
-                    # The API should guarantee valid JSON here due to response_mime_type
-                    try:
-                        parsed_fallback = json.loads(response.text)
-                        # Basic validation of fallback
-                        if "location_found" in parsed_fallback and "locations" in parsed_fallback:
-                             # Validate locations format
-                             if parsed_fallback["locations"] is None or isinstance(parsed_fallback["locations"], list):
-                                 print(f"\n--- Parsed Locations: {parsed_fallback.get('locations')} ---")
-                                 return parsed_fallback
-                             else:
-                                 # No locations found or invalid format, don't print
-                                 return {"location_found": False, "locations": None, "error": "Invalid 'locations' format in fallback JSON", "raw_response": response.text}
-                        else:
-                             return {"location_found": False, "locations": None, "error": "Invalid structure in fallback JSON", "raw_response": response.text}
-                    except json.JSONDecodeError:
-                         return {"location_found": False, "locations": None, "error": "Failed to parse fallback JSON response from AI", "raw_response": response.text}
+                # Attempt to validate and parse the JSON response text using Pydantic
+                # This might raise json.JSONDecodeError if response.text is not valid JSON,
+                # or ValidationError if JSON is valid but doesn't match the schema.
+                parsed_data = LocationResponse.model_validate_json(response.text)
+                print(f"\n--- Parsed Locations (Pydantic): {parsed_data.locations} ---")
+                return parsed_data.model_dump() # Return as dict
 
-            except (AttributeError, ValidationError, Exception) as parse_error:
-                 # Catch potential issues accessing/validating response.parsed or other unexpected errors
-                 print(f"Error processing Gemini response: {parse_error}")
-                 # Attempt fallback parsing even if initial access failed
-                 try:
-                     parsed_fallback = json.loads(response.text)
-                     if "location_found" in parsed_fallback and "locations" in parsed_fallback:
-                         if parsed_fallback["locations"] is None or isinstance(parsed_fallback["locations"], list):
-                             print(f"--- Parsed Locations (Fallback JSON after Error): {parsed_fallback.get('locations')} ---") # ADDED PRINT
-                             return parsed_fallback
-                         else:
-                             # Invalid format, don't print
-                             return {"location_found": False, "locations": None, "error": "Invalid 'locations' format in fallback JSON after error", "raw_response": response.text}
-                     else:
-                         return {"location_found": False, "locations": None, "error": "Invalid structure in fallback JSON after error", "raw_response": response.text}
-                 except Exception as fallback_e:
-                     return {"location_found": False, "locations": None, "error": f"Failed to process or parse response: {fallback_e}", "raw_response": response.text}
+            except json.JSONDecodeError as json_e:
+                # Handle cases where the response text is not valid JSON at all
+                print(f"Failed to decode JSON response: {json_e}")
+                return {"location_found": False, "locations": None, "error": f"Failed to decode JSON response from AI: {json_e}", "raw_response": response.text}
+
+            except ValidationError as ve:
+                print(f"Pydantic validation failed: {ve}")
+                # Fallback: Try basic JSON parsing if Pydantic fails (e.g., if structure is wrong)
+                # This block is now less likely to be hit for JSON errors, but might catch
+                # cases where the initial parse worked but validation failed, and we still
+                # want to try a raw parse (though Pydantic should handle most structure issues).
+                try:
+                    fallback_data = json.loads(response.text)
+                    # Basic check if it looks like our structure
+                    if isinstance(fallback_data.get("locations"), list) or fallback_data.get("locations") is None:
+                         print(f"--- Parsed Locations (Fallback JSON after Validation Error): {fallback_data.get('locations')} ---")
+                         # Return the raw dict, but flag the validation issue
+                         fallback_data["error"] = f"Pydantic validation failed: {ve}"
+                         return fallback_data
+                    else:
+                         return {"location_found": False, "locations": None, "error": f"Invalid structure in fallback JSON after validation error: {ve}", "raw_response": response.text}
+                except json.JSONDecodeError as json_e: # Should be less likely now
+                    return {"location_found": False, "locations": None, "error": f"Failed to parse JSON response during fallback attempt: {json_e}", "raw_response": response.text}
+                except Exception as e: # Catch any other unexpected error during fallback
+                     return {"location_found": False, "locations": None, "error": f"Unexpected error during fallback response processing: {e}", "raw_response": response.text}
+            except Exception as e: # Catch any other unexpected error during initial processing
+                print(f"Unexpected error processing response: {e}")
+                return {"location_found": False, "locations": None, "error": f"Unexpected error processing response: {e}", "raw_response": getattr(response, 'text', 'N/A')}
 
 
-        except Exception as e:
-            # Catch potential API call errors or other exceptions during generation
+        except errors.APIError as e:
+            # Catch specific API errors from the new SDK
             print(f"Error calling Gemini API: {e}")
             return {"location_found": False, "locations": None, "error": f"Gemini API call failed: {str(e)}"}
+        except Exception as e:
+            # Catch other potential exceptions during the API call itself (network issues, etc.)
+            print(f"An unexpected error occurred during API call/generation: {e}")
+            return {"location_found": False, "locations": None, "error": f"Unexpected error during API call: {str(e)}"}
 
 # Example usage (optional, can be removed or kept for testing)
 if __name__ == '__main__':

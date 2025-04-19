@@ -5,7 +5,7 @@
 **Core Technologies:**
 
 *   **Programming Language:** Python 3.
-*   **AI Service:** Google Gemini API (using `google-generativeai` library).
+*   **AI Service:** Google Gemini API (using `google-genai` library). **Updated (19 Apr 2025):** Migrated from `google-generativeai`.
     *   Text Analysis: `models/gemini-2.0-flash-exp` model (Updated 01 Apr 2025 from `models/gemini-1.5-pro-latest` per user request; originally fixed from `gemini-pro` 404 error).
     *   Video Analysis: TBD (e.g., `gemini-pro-vision`, `gemini-1.5-flash`).
 *   **Instagram Interaction:** `instagrapi` library.
@@ -16,7 +16,7 @@
 
 *   **Environment:** Local development environment (macOS).
 *   **Dependencies (Managed by Poetry in `pyproject.toml`):**
-    *   `google-generativeai`: For interacting with the Gemini API.
+    *   `google-genai`: For interacting with the Gemini API. **Updated (19 Apr 2025):** Replaced `google-generativeai`.
     *   `googlemaps`: For interacting with the Google Maps API.
     *   `instagrapi`: For interacting with Instagram.
     *   `click`: For building the CLI.

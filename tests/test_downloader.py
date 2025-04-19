@@ -126,6 +126,53 @@ def test_download_success(mock_instagrapi_client, mock_media_items, collection_n
         expected_metadata, mock_open().__enter__(), indent=4, ensure_ascii=False
     )
 
+# --- Tests for --skip-download flag ---
+
+def test_download_skip_download_flag_no_existing_file(mock_instagrapi_client, mock_media_items, collection_name, tmp_path, mocker):
+    """Test that download is skipped and metadata is correct when skip_download=True and no file exists."""
+    download_dir = tmp_path / "downloads"
+    collection_dir = download_dir / collection_name
+    video_item = [m for m in mock_media_items if m.pk == 111][0] # Get the first video item
+
+    # Mock Path.glob to return empty list (no existing file)
+    mocker.patch('pathlib.Path.glob', return_value=[])
+    collection_dir.mkdir(parents=True, exist_ok=True)
+
+    # Patch open and json.dump for metadata verification
+    with patch("builtins.open", MagicMock()) as mock_open, \
+         patch("json.dump", MagicMock()) as mock_json_dump:
+
+        # Call the function with skip_download=True
+        result = download_collection_media(
+            client=mock_instagrapi_client,
+            media_items=[video_item],
+            collection_name=collection_name,
+            download_dir=download_dir,
+            skip_download=True # Explicitly set skip flag
+        )
+
+    # Assertions
+    assert result is True # Metadata saving should still succeed
+    # Crucially, video_download should NOT be called
+    mock_instagrapi_client.video_download.assert_not_called()
+    # Check glob was called correctly
+    Path.glob.assert_called_once_with(f"{video_item.pk}*")
+
+    # Check metadata content passed to json.dump
+    expected_metadata = [
+        {
+            "relative_path": None, # Should be None as download was skipped
+            "caption": video_item.caption_text,
+            "url": f"https://www.instagram.com/p/{video_item.code}/",
+            "pk": video_item.pk,
+            "media_type": video_item.media_type,
+            "product_type": video_item.product_type,
+        },
+    ]
+    mock_json_dump.assert_called_once_with(
+        expected_metadata, mock_open().__enter__(), indent=4, ensure_ascii=False
+    )
+
 def test_download_skip_non_video(mock_instagrapi_client, mock_media_items, collection_name, tmp_path):
     """Test that non-video items are skipped."""
     download_dir = tmp_path / "downloads"
