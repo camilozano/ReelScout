@@ -33,20 +33,33 @@
 
 <!-- Nav -->
 <nav class="bg-gray-900 border-b border-white/10 sticky top-0 z-10">
-  <div class="max-w-6xl mx-auto px-4 flex items-center gap-2 h-14">
-    <span class="text-indigo-400 font-bold text-lg mr-4">ReelScout</span>
-    <button onclick="switchTab('setup')" id="tab-btn-setup"
-      class="tab-btn px-4 py-1.5 rounded-full text-sm font-medium transition-colors">Setup</button>
-    <button onclick="switchTab('collect')" id="tab-btn-collect"
-      class="tab-btn px-4 py-1.5 rounded-full text-sm font-medium transition-colors">Collect</button>
-    <button onclick="switchTab('analyze')" id="tab-btn-analyze"
-      class="tab-btn px-4 py-1.5 rounded-full text-sm font-medium transition-colors">Analyze</button>
-    <button onclick="switchTab('results')" id="tab-btn-results"
-      class="tab-btn px-4 py-1.5 rounded-full text-sm font-medium transition-colors">Results</button>
+  <!-- Row 1: Logo + user selector -->
+  <div class="max-w-6xl mx-auto px-4 flex items-center justify-between h-12">
+    <span class="text-indigo-400 font-bold text-lg">ReelScout</span>
+    <div class="flex items-center gap-2">
+      <label class="text-xs text-gray-400 hidden sm:block">Account:</label>
+      <select id="active-user-select" onchange="onUserChange(this.value)"
+        class="bg-gray-800 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-28">
+        <option value="">-- no account --</option>
+      </select>
+    </div>
+  </div>
+  <!-- Row 2: Tab strip (full width, equal buttons) -->
+  <div class="border-t border-white/10">
+    <div class="max-w-6xl mx-auto flex">
+      <button onclick="switchTab('setup')" id="tab-btn-setup"
+        class="tab-btn flex-1 py-3 text-xs sm:text-sm font-medium transition-colors text-center">Setup</button>
+      <button onclick="switchTab('collect')" id="tab-btn-collect"
+        class="tab-btn flex-1 py-3 text-xs sm:text-sm font-medium transition-colors text-center">Collect</button>
+      <button onclick="switchTab('analyze')" id="tab-btn-analyze"
+        class="tab-btn flex-1 py-3 text-xs sm:text-sm font-medium transition-colors text-center">Analyze</button>
+      <button onclick="switchTab('results')" id="tab-btn-results"
+        class="tab-btn flex-1 py-3 text-xs sm:text-sm font-medium transition-colors text-center">Results</button>
+    </div>
   </div>
 </nav>
 
-<main class="max-w-6xl mx-auto px-4 py-8">
+<main class="max-w-6xl mx-auto px-4 py-4 sm:py-8">
 
   <!-- ── SETUP TAB ── -->
   <div id="tab-setup" class="tab-content fade-in">
@@ -59,40 +72,55 @@
       <span>Maps Key: <span id="status-maps" class="font-semibold">—</span></span>
     </div>
 
-    <!-- Instagram Login -->
+    <!-- Instagram Accounts -->
     <div class="bg-gray-900 rounded-2xl ring-1 ring-white/10 p-6 mb-6">
-      <h3 class="text-lg font-semibold mb-4">Instagram Login</h3>
-      <div id="login-form" class="space-y-4">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-xs text-gray-400 mb-1">Username</label>
-            <input id="ig-username" type="text" placeholder="your_username"
-              class="w-full bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          </div>
-          <div>
-            <label class="block text-xs text-gray-400 mb-1">Password</label>
-            <input id="ig-password" type="password" placeholder="••••••••"
-              class="w-full bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          </div>
-        </div>
-        <div class="flex gap-3 items-center">
-          <button onclick="doInstagramLogin()"
-            class="btn-primary px-5 py-2 text-sm rounded-lg font-medium">Login</button>
-          <button onclick="doDeleteSession()"
-            class="px-5 py-2 text-sm rounded-lg font-medium bg-gray-800 hover:bg-gray-700 transition-colors">Clear Session</button>
-          <span id="login-msg" class="text-sm"></span>
-        </div>
-      </div>
+      <h3 class="text-lg font-semibold mb-4">Instagram Accounts</h3>
 
-      <!-- 2FA form (hidden initially) -->
-      <div id="twofa-form" class="hidden space-y-4 mt-2">
-        <p class="text-sm text-yellow-400">Two-factor authentication required.</p>
-        <div class="flex gap-3 items-center">
-          <input id="twofa-code" type="text" placeholder="6-digit code" maxlength="8"
-            class="bg-gray-800 rounded-lg px-3 py-2 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <button onclick="doInstagram2FA()"
-            class="btn-primary px-5 py-2 text-sm rounded-lg font-medium">Verify</button>
-          <span id="twofa-msg" class="text-sm"></span>
+      <!-- Existing accounts list -->
+      <div id="users-list" class="mb-4 space-y-1"></div>
+
+      <!-- Add Account toggle button -->
+      <button id="add-account-btn" onclick="showAddAccountForm()"
+        class="px-4 py-2 text-sm rounded-lg font-medium bg-gray-800 hover:bg-gray-700 transition-colors">
+        ＋ Add Account
+      </button>
+
+      <!-- Add Account form (hidden by default) -->
+      <div id="add-account-section" class="hidden mt-4 border-t border-white/10 pt-4">
+        <div id="login-form" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Username</label>
+              <input id="ig-username" type="text" placeholder="your_username"
+                class="w-full bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Password</label>
+              <input id="ig-password" type="password" placeholder="••••••••"
+                class="w-full bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+          </div>
+          <div class="flex gap-3 items-center">
+            <button onclick="doInstagramLogin()"
+              class="btn-primary px-5 py-2 text-sm rounded-lg font-medium">Login</button>
+            <button onclick="cancelAddAccount()"
+              class="px-5 py-2 text-sm rounded-lg font-medium bg-gray-800 hover:bg-gray-700 transition-colors">Cancel</button>
+            <span id="login-msg" class="text-sm"></span>
+          </div>
+        </div>
+
+        <!-- 2FA form (hidden initially) -->
+        <div id="twofa-form" class="hidden space-y-4 mt-2">
+          <p class="text-sm text-yellow-400">Two-factor authentication required.</p>
+          <div class="flex gap-3 items-center">
+            <input id="twofa-code" type="text" placeholder="6-digit code" maxlength="8"
+              class="bg-gray-800 rounded-lg px-3 py-2 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <button onclick="doInstagram2FA()"
+              class="btn-primary px-5 py-2 text-sm rounded-lg font-medium">Verify</button>
+            <button onclick="doCancel2FA()"
+              class="px-5 py-2 text-sm rounded-lg font-medium bg-gray-800 hover:bg-gray-700 transition-colors">Cancel</button>
+            <span id="twofa-msg" class="text-sm"></span>
+          </div>
         </div>
       </div>
     </div>
@@ -138,9 +166,9 @@
           Skip Download
         </label>
         <button id="collect-btn" onclick="startCollect()"
-          class="btn-primary px-6 py-2 text-sm rounded-lg font-medium pb-2">Start Collect</button>
+          class="btn-primary w-full sm:w-auto px-6 py-2.5 text-sm rounded-lg font-medium">Start Collect</button>
         <button onclick="loadInstagramCollections()"
-          class="px-4 py-2 text-sm rounded-lg font-medium bg-gray-800 hover:bg-gray-700 transition-colors pb-2">↻ Refresh</button>
+          class="w-full sm:w-auto px-4 py-2.5 text-sm rounded-lg font-medium bg-gray-800 hover:bg-gray-700 transition-colors">↻ Refresh</button>
       </div>
 
       <!-- Progress -->
@@ -174,9 +202,9 @@
           </select>
         </div>
         <button id="analyze-btn" onclick="startAnalyze()"
-          class="btn-primary px-6 py-2 text-sm rounded-lg font-medium pb-2">Start Analyze</button>
+          class="btn-primary w-full sm:w-auto px-6 py-2.5 text-sm rounded-lg font-medium">Start Analyze</button>
         <button onclick="loadLocalCollections()"
-          class="px-4 py-2 text-sm rounded-lg font-medium bg-gray-800 hover:bg-gray-700 transition-colors pb-2">↻ Refresh</button>
+          class="w-full sm:w-auto px-4 py-2.5 text-sm rounded-lg font-medium bg-gray-800 hover:bg-gray-700 transition-colors">↻ Refresh</button>
       </div>
 
       <!-- Progress -->
@@ -219,9 +247,9 @@
           </select>
         </div>
         <button onclick="loadResults()"
-          class="btn-primary px-6 py-2 text-sm rounded-lg font-medium pb-2">Load</button>
+          class="btn-primary w-full sm:w-auto px-6 py-2.5 text-sm rounded-lg font-medium">Load</button>
         <button onclick="loadLocalCollectionsForResults()"
-          class="px-4 py-2 text-sm rounded-lg font-medium bg-gray-800 hover:bg-gray-700 transition-colors pb-2">↻ Refresh</button>
+          class="w-full sm:w-auto px-4 py-2.5 text-sm rounded-lg font-medium bg-gray-800 hover:bg-gray-700 transition-colors">↻ Refresh</button>
       </div>
     </div>
 
@@ -261,6 +289,8 @@
   // ── State ──
   let currentTab = 'collect';
   let pendingTwofaToken = null;
+  let currentUser = null;
+  let availableUsers = [];
 
   // ── Tab switching ──
   function switchTab(name) {
@@ -273,12 +303,102 @@
 
   // ── Init ──
   async function init() {
+    await refreshUserSelector();
     await checkAuthStatus();
-    await Promise.all([
-      loadInstagramCollections(),
-      loadLocalCollections(),
-      loadLocalCollectionsForResults(),
-    ]);
+    await renderUsersList();
+    if (currentUser) {
+      await Promise.all([
+        loadInstagramCollections(),
+        loadLocalCollections(),
+        loadLocalCollectionsForResults(),
+      ]);
+    }
+  }
+
+  // ── User selector ──
+  async function refreshUserSelector() {
+    try {
+      const r = await fetch('/api/auth/users');
+      const users = await r.json();
+      availableUsers = users.map(u => u.username);
+      const sel = document.getElementById('active-user-select');
+      if (availableUsers.length === 0) {
+        sel.innerHTML = '<option value="">-- no account --</option>';
+        currentUser = null;
+      } else {
+        sel.innerHTML = availableUsers.map(u => `<option value="${esc(u)}">${esc(u)}</option>`).join('');
+        if (!currentUser || !availableUsers.includes(currentUser)) {
+          currentUser = availableUsers[0];
+        }
+        sel.value = currentUser;
+      }
+    } catch(e) {
+      console.error('Error fetching users:', e);
+    }
+  }
+
+  function onUserChange(username) {
+    currentUser = username || null;
+    loadInstagramCollections();
+    loadLocalCollections();
+    loadLocalCollectionsForResults();
+  }
+
+  // ── Users list in Setup tab ──
+  async function renderUsersList() {
+    const listEl = document.getElementById('users-list');
+    if (availableUsers.length === 0) {
+      listEl.innerHTML = '<p class="text-sm text-gray-500">No accounts linked yet.</p>';
+      return;
+    }
+    listEl.innerHTML = availableUsers.map(u => `
+      <div class="flex items-center justify-between py-2 border-b border-white/5">
+        <span class="text-sm font-medium">${esc(u)}</span>
+        <button onclick="doRemoveUser('${esc(u)}')"
+          class="text-xs px-3 py-2.5 rounded-lg bg-gray-800 hover:bg-red-900/50 hover:text-red-300 transition-colors min-h-[44px]">
+          Remove
+        </button>
+      </div>
+    `).join('');
+  }
+
+  async function doRemoveUser(username) {
+    if (!confirm(`Remove account '${username}'?`)) return;
+    await fetch(`/api/auth/instagram/session/${encodeURIComponent(username)}`, {method: 'DELETE'});
+    if (currentUser === username) currentUser = null;
+    await refreshUserSelector();
+    await renderUsersList();
+    await checkAuthStatus();
+    if (currentUser) {
+      loadInstagramCollections();
+      loadLocalCollections();
+      loadLocalCollectionsForResults();
+    }
+  }
+
+  // ── Add account form ──
+  function showAddAccountForm() {
+    document.getElementById('add-account-section').classList.remove('hidden');
+    document.getElementById('add-account-btn').classList.add('hidden');
+  }
+
+  function cancelAddAccount() {
+    document.getElementById('add-account-section').classList.add('hidden');
+    document.getElementById('add-account-btn').classList.remove('hidden');
+    document.getElementById('login-form').classList.remove('hidden');
+    document.getElementById('twofa-form').classList.add('hidden');
+    document.getElementById('login-msg').textContent = '';
+    document.getElementById('ig-username').value = '';
+    document.getElementById('ig-password').value = '';
+    pendingTwofaToken = null;
+  }
+
+  function doCancel2FA() {
+    pendingTwofaToken = null;
+    document.getElementById('twofa-form').classList.add('hidden');
+    document.getElementById('login-form').classList.remove('hidden');
+    document.getElementById('twofa-msg').textContent = '';
+    document.getElementById('twofa-code').value = '';
   }
 
   // ── Auth status ──
@@ -286,11 +406,11 @@
     try {
       const r = await fetch('/api/auth/status');
       const d = await r.json();
-      setStatusBadge('status-instagram', d.instagram);
+      setStatusBadge('status-instagram', d.has_session);
       setStatusBadge('status-gemini', d.gemini_key);
       setStatusBadge('status-maps', d.maps_key);
 
-      if (!d.instagram || !d.gemini_key || !d.maps_key) {
+      if (!d.has_session || !d.gemini_key || !d.maps_key) {
         switchTab('setup');
       } else {
         switchTab('collect');
@@ -322,7 +442,15 @@
       const d = await r.json();
       if (d.status === 'ok') {
         msg.textContent = 'Logged in!'; msg.className = 'text-sm text-green-400';
+        await refreshUserSelector();
+        await renderUsersList();
+        cancelAddAccount();
         await checkAuthStatus();
+        if (currentUser) {
+          loadInstagramCollections();
+          loadLocalCollections();
+          loadLocalCollectionsForResults();
+        }
       } else if (d.status === '2fa_required') {
         pendingTwofaToken = d.token;
         document.getElementById('login-form').classList.add('hidden');
@@ -349,23 +477,22 @@
       const d = await r.json();
       if (d.status === 'ok') {
         msg.textContent = 'Verified!'; msg.className = 'text-sm text-green-400';
-        document.getElementById('twofa-form').classList.add('hidden');
-        document.getElementById('login-form').classList.remove('hidden');
         pendingTwofaToken = null;
+        await refreshUserSelector();
+        await renderUsersList();
+        cancelAddAccount();
         await checkAuthStatus();
+        if (currentUser) {
+          loadInstagramCollections();
+          loadLocalCollections();
+          loadLocalCollectionsForResults();
+        }
       } else {
         msg.textContent = d.message || 'Verification failed.'; msg.className = 'text-sm text-red-400';
       }
     } catch(e) {
       msg.textContent = 'Network error.'; msg.className = 'text-sm text-red-400';
     }
-  }
-
-  async function doDeleteSession() {
-    const msg = document.getElementById('login-msg');
-    await fetch('/api/auth/instagram/session', {method: 'DELETE'});
-    msg.textContent = 'Session cleared.'; msg.className = 'text-sm text-yellow-400';
-    await checkAuthStatus();
   }
 
   // ── API keys ──
@@ -395,9 +522,13 @@
   // ── Collections ──
   async function loadInstagramCollections() {
     const sel = document.getElementById('collect-collection');
+    if (!currentUser) {
+      sel.innerHTML = '<option value="">-- select account first --</option>';
+      return;
+    }
     sel.innerHTML = '<option value="">-- loading... --</option>';
     try {
-      const r = await fetch('/api/collections/instagram');
+      const r = await fetch(`/api/collections/instagram?user=${encodeURIComponent(currentUser)}`);
       if (!r.ok) { sel.innerHTML = '<option value="">-- not logged in --</option>'; return; }
       const cols = await r.json();
       sel.innerHTML = cols.length
@@ -410,9 +541,13 @@
 
   async function loadLocalCollections() {
     const sel = document.getElementById('analyze-collection');
+    if (!currentUser) {
+      sel.innerHTML = '<option value="">-- select account first --</option>';
+      return;
+    }
     sel.innerHTML = '<option value="">-- loading... --</option>';
     try {
-      const r = await fetch('/api/collections/local');
+      const r = await fetch(`/api/collections/local?user=${encodeURIComponent(currentUser)}`);
       const cols = await r.json();
       sel.innerHTML = cols.length
         ? cols.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('')
@@ -424,8 +559,12 @@
 
   async function loadLocalCollectionsForResults() {
     const sel = document.getElementById('results-collection');
+    if (!currentUser) {
+      sel.innerHTML = '<option value="">-- select account first --</option>';
+      return;
+    }
     try {
-      const r = await fetch('/api/collections/local');
+      const r = await fetch(`/api/collections/local?user=${encodeURIComponent(currentUser)}`);
       const cols = await r.json();
       sel.innerHTML = cols.length
         ? '<option value="">-- select --</option>' + cols.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('')
@@ -437,6 +576,8 @@
 
   // ── Collect ──
   async function startCollect() {
+    if (!currentUser) { alert('Please select an account first.'); return; }
+
     const sel = document.getElementById('collect-collection');
     const collectionId = sel.value;
     const collectionName = sel.options[sel.selectedIndex]?.dataset?.name || sel.options[sel.selectedIndex]?.text || collectionId;
@@ -454,7 +595,12 @@
 
     const r = await fetch('/api/jobs/collect', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({collection_id: collectionId, collection_name: collectionName, skip_download: skipDownload}),
+      body: JSON.stringify({
+        collection_id: collectionId,
+        collection_name: collectionName,
+        skip_download: skipDownload,
+        username: currentUser,
+      }),
     });
     const {job_id} = await r.json();
 
@@ -487,6 +633,8 @@
 
   // ── Analyze ──
   async function startAnalyze() {
+    if (!currentUser) { alert('Please select an account first.'); return; }
+
     const collectionName = document.getElementById('analyze-collection').value;
     if (!collectionName) { alert('Select a collection first.'); return; }
 
@@ -502,7 +650,7 @@
 
     const r = await fetch('/api/jobs/analyze', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({collection_name: collectionName}),
+      body: JSON.stringify({collection_name: collectionName, username: currentUser}),
     });
     const {job_id} = await r.json();
 
@@ -539,10 +687,12 @@
 
   // ── Results ──
   async function loadResults() {
+    if (!currentUser) { alert('Please select an account first.'); return; }
+
     const collectionName = document.getElementById('results-collection').value;
     if (!collectionName) { alert('Select a collection first.'); return; }
 
-    const r = await fetch(`/api/results/${encodeURIComponent(collectionName)}`);
+    const r = await fetch(`/api/results/${encodeURIComponent(collectionName)}?user=${encodeURIComponent(currentUser)}`);
     if (!r.ok) { alert('Failed to load results.'); return; }
     const items = await r.json();
 
@@ -567,7 +717,7 @@
       const mediaPath = item.relative_path;
       let mediaCellHtml = '<span class="text-gray-600 text-xs">No media</span>';
       if (mediaPath) {
-        const url = `/media/${encodeURIComponent(collectionName)}/${encodeURIComponent(mediaPath)}`;
+        const url = `/media/${encodeURIComponent(currentUser)}/${encodeURIComponent(collectionName)}/${encodeURIComponent(mediaPath)}`;
         if (item.media_type === 2 || (item.media_type === 8 && mediaPath)) {
           // Video or carousel (we try to show first file)
           mediaCellHtml = `
