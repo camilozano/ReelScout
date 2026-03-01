@@ -736,6 +736,21 @@
         }
       }
 
+      // Post cell
+      const typeLabel = item.media_type === 8 ? 'Carousel' : item.media_type === 2 ? 'Reel' : 'Photo';
+      const caption = item.caption || '';
+      const PREVIEW_LEN = 150;
+      const captionPreview = caption.length > PREVIEW_LEN ? caption.slice(0, PREVIEW_LEN) + '…' : caption;
+      const captionHtml = caption.length === 0
+        ? '<span class="text-gray-600 text-xs italic">No caption</span>'
+        : caption.length <= PREVIEW_LEN
+          ? `<p class="text-xs text-gray-400 leading-relaxed whitespace-pre-wrap">${esc(caption)}</p>`
+          : `<p class="text-xs text-gray-400 leading-relaxed whitespace-pre-wrap">${esc(captionPreview)}</p>
+             <details class="mt-1">
+               <summary class="text-xs text-indigo-400 hover:text-indigo-300 cursor-pointer select-none">▸ show full caption</summary>
+               <p class="text-xs text-gray-400 leading-relaxed whitespace-pre-wrap mt-1 max-h-40 overflow-y-auto">${esc(caption)}</p>
+             </details>`;
+
       // Locations cell
       const analysis = item.caption_analysis || {};
       const enrichments = item.google_maps_enrichment || [];
@@ -764,9 +779,15 @@
 
       tr.innerHTML = `
         <td class="py-3 pr-4 align-top">${mediaCellHtml}</td>
-        <td class="py-3 pr-4 align-top">
-          <a href="${esc(item.url || '#')}" target="_blank" rel="noopener"
-            class="text-indigo-400 hover:underline text-xs">Open Post ↗</a>
+        <td class="py-3 pr-4 align-top min-w-[180px] max-w-xs">
+          <div class="space-y-1.5">
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-gray-500">${typeLabel}</span>
+              <a href="${esc(item.url || '#')}" target="_blank" rel="noopener"
+                class="text-indigo-400 hover:underline text-xs">Open ↗</a>
+            </div>
+            ${captionHtml}
+          </div>
         </td>
         <td class="py-3 pr-4 align-top text-xs">${locationHtml || '<span class="text-gray-600">—</span>'}</td>
         <td class="py-3 align-top">${badge}</td>
