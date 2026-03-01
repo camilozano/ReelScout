@@ -22,7 +22,7 @@ class AIAnalyzer:
         model (genai.GenerativeModel): The initialized Gemini model instance.
     """
     #DEFAULT_MODEL_NAME = 'models/gemini-2.0-flash-lite'
-    DEFAULT_MODEL_NAME = 'models/gemini-2.5-flash-preview-04-17'
+    DEFAULT_MODEL_NAME = 'gemini-3-flash-preview'
 
     def __init__(self, api_key: Optional[str] = None, model_name: Optional[str] = None):
         """
@@ -74,13 +74,17 @@ class AIAnalyzer:
         if not caption:
             return {"location_found": False, "locations": None, "error": "Empty caption provided"}
 
-        # Simplified prompt focusing on the task, not the format
         prompt = f"""
-Analyze the following Instagram post caption to identify specific locations mentioned.
-Focus on precise places like restaurants, landmarks, points of interest, shops, parks, specific addresses, etc.
-For each specific location found, also include any mentioned city, state, region, or country that provides context for that location.
-If only a general area (like a city or country) is mentioned without a specific point of interest, include that as well only if there is not a specific location mentioned.
-Do not include general areas as individual items in the list, include them as part of the context for specific locations.
+You are analyzing Instagram travel post captions to extract named locations for Google Maps lookup.
+
+Extract every specific, searchable location mentioned — restaurants, cafes, bars, hotels, beaches, landmarks, neighborhoods, parks, viewpoints, etc.
+
+Rules:
+- Format each location as a Google Maps search query, appending city/country context where inferable: e.g. "Sagrada Família, Barcelona" not just "Sagrada Família"
+- Include a standalone city or region ONLY if no specific venue is mentioned
+- Ignore vague references like "a cute café" or "somewhere in Europe"
+- Check for 📍 pins, hashtags (#playa-del-carmen), and @-tagged place names — these often contain locations
+- If truly no location is present, return location_found: false
 
 Caption:
 "{caption}"

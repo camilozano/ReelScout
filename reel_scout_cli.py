@@ -1,13 +1,10 @@
 import click
 import logging
 import sys
-import json
 from pathlib import Path
-import time # Import time for potential delays
 from src.instagram_client import InstagramClient
 from src.downloader import download_collection_media
-from src.ai_analyzer import AIAnalyzer # Import the class
-from src.location_enricher import enrich_location_data # Import the enrichment function
+from src.pipeline import run_analyze_pipeline
 
 # Configure basic logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s') # Simplified format slightly
@@ -135,143 +132,37 @@ def analyze_collection(collection_name: str, download_dir: Path):
     click.echo(f"Analyzing collection: {collection_name}")
     click.echo(f"Using download directory: {download_dir}")
 
-    metadata_path = download_dir.resolve() / collection_name / "metadata.json"
-
-    if not metadata_path.is_file():
-        logger.error(f"Metadata file not found: {metadata_path}")
-        click.echo(f"Error: Metadata file not found at {metadata_path}", err=True)
-        sys.exit(1)
-
-    click.echo(f"Reading metadata from: {metadata_path}")
     try:
-        with open(metadata_path, 'r') as f:
-            metadata_items = json.load(f)
-    except json.JSONDecodeError:
-        logger.exception(f"Failed to decode JSON from {metadata_path}")
-        click.echo(f"Error: Could not read or parse JSON from {metadata_path}", err=True)
+        summary = run_analyze_pipeline(
+            collection_name=collection_name,
+            download_dir=download_dir.resolve(),
+        )
+    except FileNotFoundError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except RuntimeError as e:
+        click.echo(f"Error: {e}", err=True)
         sys.exit(1)
     except Exception as e:
-        logger.exception(f"Failed to read metadata file {metadata_path}")
-        click.echo(f"Error: Could not read metadata file: {e}", err=True)
+        logger.exception("Unexpected error during analysis pipeline")
+        click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 
-    if not metadata_items:
-        click.echo("Metadata file is empty. Nothing to analyze.")
-        sys.exit(0)
+    click.echo(f"\nTotal items: {summary['total_items']}")
+    click.echo(f"Analysis errors: {summary['analysis_errors']}")
+    click.echo(f"Enrichment success: {summary['enrichment_success']}")
+    click.echo(f"Enrichment errors: {summary['enrichment_errors']}")
+    click.echo(f"\n--- Analysis & Enrichment process completed! ---")
 
-    click.echo(f"Found {len(metadata_items)} items to analyze.")
-    updated_items = []
-    analysis_errors = 0
-    enrichment_errors = 0
-    enrichment_success = 0
 
-    # Instantiate the AI Analyzer
-    try:
-        analyzer = AIAnalyzer()
-        click.echo(f"Using AI model: {analyzer.model_name}")
-    except ValueError as e:
-        logger.error(f"Failed to initialize AI Analyzer: {e}")
-        click.echo(f"Error initializing AI Analyzer: {e}. Ensure GEMINI_API_KEY is set.", err=True)
-        sys.exit(1)
-
-    # Analyze captions first
-    click.echo("Phase 1: Analyzing captions with AI...")
-    with click.progressbar(metadata_items, label='Analyzing captions') as bar:
-        for item in bar:
-            # Ensure 'caption_analysis' key exists, even if skipping
-            if 'caption_analysis' not in item:
-                 item['caption_analysis'] = {}
-
-            caption = item.get('caption')
-            if not caption:
-                logger.warning(f"Item with URL {item.get('url', 'N/A')} has no caption. Skipping analysis.")
-                logger.warning(f"Item with URL {item.get('url', 'N/A')} has no caption. Skipping AI analysis.")
-                item['caption_analysis'].update({"location_found": False, "locations": None, "error": "No caption provided"})
-                # No need to append here, we process all items later
-                continue
-
-            try:
-                # Call the analysis method on the analyzer instance
-                analysis_result = analyzer.analyze_caption_for_location(caption)
-                # Merge analysis results into existing dict
-                item['caption_analysis'].update(analysis_result)
-                if analysis_result.get("error"):
-                    logger.warning(f"AI Analysis error for URL {item.get('url', 'N/A')}: {analysis_result['error']}")
-                    analysis_errors += 1
-            except Exception as e:
-                # Catch unexpected errors during the analysis call itself
-                logger.exception(f"Unexpected error during AI analysis for URL {item.get('url', 'N/A')}")
-                item['caption_analysis'].update({"location_found": False, "locations": None, "error": f"Unexpected AI analysis error: {str(e)}"})
-                analysis_errors += 1
-            # No append here, process enrichment next
-
-    click.echo(f"\nAI Caption Analysis complete. {analysis_errors} items had AI analysis errors.")
-
-    # Phase 2: Enrich locations using Google Maps
-    click.echo("\nPhase 2: Enriching found locations with Google Maps...")
-    items_to_enrich = [item for item in metadata_items if item.get('caption_analysis', {}).get('location_found')]
-
-    if not items_to_enrich:
-        click.echo("No locations found by AI analysis. Skipping Google Maps enrichment.")
-    else:
-        click.echo(f"Found locations in {len(items_to_enrich)} items. Starting enrichment...")
-        with click.progressbar(items_to_enrich, label='Enriching locations') as bar:
-            for item in bar:
-                locations_to_enrich = item.get('caption_analysis', {}).get('locations', [])
-                if not locations_to_enrich:
-                    continue # Should not happen if location_found is True, but safety check
-
-                item['google_maps_enrichment'] = [] # Initialize enrichment list
-
-                for loc_name in locations_to_enrich:
-                    if not isinstance(loc_name, str) or not loc_name.strip():
-                        logger.warning(f"Skipping invalid location name '{loc_name}' for URL {item.get('url', 'N/A')}")
-                        item['google_maps_enrichment'].append({
-                            "original_name": loc_name,
-                            "google_maps_data": None,
-                            "error": "Invalid location name provided by AI"
-                        })
-                        enrichment_errors += 1
-                        continue
-
-                    enriched_data = None
-                    error_msg = None
-                    try:
-                        # Add a small delay to avoid hitting rate limits too quickly if any
-                        # time.sleep(0.1) # Optional: uncomment if rate limiting becomes an issue
-                        enriched_data = enrich_location_data(loc_name)
-                        if enriched_data:
-                            enrichment_success += 1
-                        else:
-                            # enrich_location_data logs warnings/errors internally
-                            error_msg = "Enrichment failed or no results"
-                            enrichment_errors += 1
-                    except Exception as e:
-                        logger.exception(f"Unexpected error during Google Maps enrichment for '{loc_name}' (URL: {item.get('url', 'N/A')})")
-                        error_msg = f"Unexpected enrichment error: {str(e)}"
-                        enrichment_errors += 1
-
-                    item['google_maps_enrichment'].append({
-                        "original_name": loc_name,
-                        "google_maps_data": enriched_data,
-                        "error": error_msg # Store error if enrichment failed
-                    })
-
-        click.echo(f"\nGoogle Maps Enrichment complete. Successfully enriched: {enrichment_success}, Errors/Not Found: {enrichment_errors}.")
-
-    # Save the final results (all items, including those not enriched)
-    click.echo(f"\nSaving updated metadata (including enrichment) back to: {metadata_path}")
-    try:
-        with open(metadata_path, 'w') as f:
-            # Dump the original metadata_items list, which now contains updated items
-            json.dump(metadata_items, f, indent=4)
-        click.echo("Metadata file updated successfully.")
-    except Exception as e:
-        logger.exception(f"Failed to write updated metadata to {metadata_path}")
-        click.echo(f"Error: Could not write updated metadata file: {e}", err=True)
-        sys.exit(1)
-
-    click.echo("\n--- Analysis & Enrichment process completed! ---")
+@cli.command('serve')
+@click.option('--host', default='0.0.0.0', show_default=True, help="Host to bind to.")
+@click.option('--port', default=8000, show_default=True, help="Port to listen on.")
+@click.option('--reload', is_flag=True, default=False, help="Enable auto-reload (dev mode).")
+def serve(host, port, reload):
+    """Start the ReelScout web UI server."""
+    import uvicorn
+    uvicorn.run("src.api.app:app", host=host, port=port, reload=reload)
 
 
 if __name__ == '__main__':

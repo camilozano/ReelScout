@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ReelScout</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] },
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', ui-sans-serif, system-ui; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .log-area { font-family: 'Courier New', Courier, monospace; font-size: 0.75rem; }
+
+    .fade-in { animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .progress-bar-fill { transition: width 0.3s ease; }
+  </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen">
+
+<!-- Nav -->
+<nav class="bg-gray-900 border-b border-white/10 sticky top-0 z-10">
+  <div class="max-w-6xl mx-auto px-4 flex items-center gap-2 h-14">
+    <span class="text-indigo-400 font-bold text-lg mr-4">ReelScout</span>
+    <button onclick="switchTab('setup')" id="tab-btn-setup"
+      class="tab-btn px-4 py-1.5 rounded-full text-sm font-medium transition-colors">Setup</button>
+    <button onclick="switchTab('collect')" id="tab-btn-collect"
+      class="tab-btn px-4 py-1.5 rounded-full text-sm font-medium transition-colors">Collect</button>
+    <button onclick="switchTab('analyze')" id="tab-btn-analyze"
+      class="tab-btn px-4 py-1.5 rounded-full text-sm font-medium transition-colors">Analyze</button>
+    <button onclick="switchTab('results')" id="tab-btn-results"
+      class="tab-btn px-4 py-1.5 rounded-full text-sm font-medium transition-colors">Results</button>
+  </div>
+</nav>
+
+<main class="max-w-6xl mx-auto px-4 py-8">
+
+  <!-- ── SETUP TAB ── -->
+  <div id="tab-setup" class="tab-content fade-in">
+    <h2 class="text-2xl font-semibold mb-6">Setup</h2>
+
+    <!-- Auth status banner -->
+    <div id="auth-banner" class="mb-6 p-4 rounded-2xl ring-1 ring-white/10 bg-gray-900 text-sm flex flex-wrap gap-4">
+      <span>Instagram: <span id="status-instagram" class="font-semibold">—</span></span>
+      <span>Gemini Key: <span id="status-gemini" class="font-semibold">—</span></span>
+      <span>Maps Key: <span id="status-maps" class="font-semibold">—</span></span>
+    </div>
+
+    <!-- Instagram Login -->
+    <div class="bg-gray-900 rounded-2xl ring-1 ring-white/10 p-6 mb-6">
+      <h3 class="text-lg font-semibold mb-4">Instagram Login</h3>
+      <div id="login-form" class="space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Username</label>
+            <input id="ig-username" type="text" placeholder="your_username"
+              class="w-full bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Password</label>
+            <input id="ig-password" type="password" placeholder="••••••••"
+              class="w-full bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+        <div class="flex gap-3 items-center">
+          <button onclick="doInstagramLogin()"
+            class="btn-primary px-5 py-2 text-sm rounded-lg font-medium">Login</button>
+          <button onclick="doDeleteSession()"
+            class="px-5 py-2 text-sm rounded-lg font-medium bg-gray-800 hover:bg-gray-700 transition-colors">Clear Session</button>
+          <span id="login-msg" class="text-sm"></span>
+        </div>
+      </div>
+
+      <!-- 2FA form (hidden initially) -->
+      <div id="twofa-form" class="hidden space-y-4 mt-2">
+        <p class="text-sm text-yellow-400">Two-factor authentication required.</p>
+        <div class="flex gap-3 items-center">
+          <input id="twofa-code" type="text" placeholder="6-digit code" maxlength="8"
+            class="bg-gray-800 rounded-lg px-3 py-2 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <button onclick="doInstagram2FA()"
+            class="btn-primary px-5 py-2 text-sm rounded-lg font-medium">Verify</button>
+          <span id="twofa-msg" class="text-sm"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- API Keys -->
+    <div class="bg-gray-900 rounded-2xl ring-1 ring-white/10 p-6">
+      <h3 class="text-lg font-semibold mb-4">API Keys</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Gemini API Key</label>
+          <input id="gemini-key" type="password" placeholder="AIza..."
+            class="w-full bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Google Places API Key</label>
+          <input id="maps-key" type="password" placeholder="AIza..."
+            class="w-full bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+      </div>
+      <div class="flex gap-3 items-center">
+        <button onclick="doSaveKeys()"
+          class="btn-primary px-5 py-2 text-sm rounded-lg font-medium">Save Keys</button>
+        <span id="keys-msg" class="text-sm"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── COLLECT TAB ── -->
+  <div id="tab-collect" class="tab-content fade-in">
+    <h2 class="text-2xl font-semibold mb-6">Collect</h2>
+
+    <div class="bg-gray-900 rounded-2xl ring-1 ring-white/10 p-6 mb-6">
+      <div class="flex flex-wrap gap-4 items-end mb-4">
+        <div class="flex-1 min-w-48">
+          <label class="block text-xs text-gray-400 mb-1">Instagram Collection</label>
+          <select id="collect-collection"
+            class="w-full bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="">-- loading... --</option>
+          </select>
+        </div>
+        <label class="flex items-center gap-2 text-sm cursor-pointer select-none pb-2">
+          <input id="collect-skip" type="checkbox" class="accent-indigo-500" />
+          Skip Download
+        </label>
+        <button id="collect-btn" onclick="startCollect()"
+          class="btn-primary px-6 py-2 text-sm rounded-lg font-medium pb-2">Start Collect</button>
+        <button onclick="loadInstagramCollections()"
+          class="px-4 py-2 text-sm rounded-lg font-medium bg-gray-800 hover:bg-gray-700 transition-colors pb-2">↻ Refresh</button>
+      </div>
+
+      <!-- Progress -->
+      <div id="collect-progress-wrap" class="hidden space-y-3">
+        <div>
+          <div class="flex justify-between text-xs text-gray-400 mb-1">
+            <span id="collect-progress-label">Collecting...</span>
+            <span id="collect-progress-pct">0%</span>
+          </div>
+          <div class="w-full bg-gray-800 rounded-full h-2">
+            <div id="collect-progress-bar" class="progress-bar-fill bg-indigo-500 h-2 rounded-full" style="width:0%"></div>
+          </div>
+        </div>
+        <div id="collect-log"
+          class="log-area bg-gray-950 rounded-lg p-3 h-48 overflow-y-auto text-gray-400"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ANALYZE TAB ── -->
+  <div id="tab-analyze" class="tab-content fade-in">
+    <h2 class="text-2xl font-semibold mb-6">Analyze</h2>
+
+    <div class="bg-gray-900 rounded-2xl ring-1 ring-white/10 p-6 mb-6">
+      <div class="flex flex-wrap gap-4 items-end mb-4">
+        <div class="flex-1 min-w-48">
+          <label class="block text-xs text-gray-400 mb-1">Local Collection</label>
+          <select id="analyze-collection"
+            class="w-full bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="">-- loading... --</option>
+          </select>
+        </div>
+        <button id="analyze-btn" onclick="startAnalyze()"
+          class="btn-primary px-6 py-2 text-sm rounded-lg font-medium pb-2">Start Analyze</button>
+        <button onclick="loadLocalCollections()"
+          class="px-4 py-2 text-sm rounded-lg font-medium bg-gray-800 hover:bg-gray-700 transition-colors pb-2">↻ Refresh</button>
+      </div>
+
+      <!-- Progress -->
+      <div id="analyze-progress-wrap" class="hidden space-y-3">
+        <div>
+          <div class="flex justify-between text-xs text-gray-400 mb-1">
+            <span>Phase 1 — AI Caption Analysis</span>
+            <span id="analyze-p1-pct">0%</span>
+          </div>
+          <div class="w-full bg-gray-800 rounded-full h-2">
+            <div id="analyze-p1-bar" class="progress-bar-fill bg-indigo-500 h-2 rounded-full" style="width:0%"></div>
+          </div>
+        </div>
+        <div>
+          <div class="flex justify-between text-xs text-gray-400 mb-1">
+            <span>Phase 2 — Google Maps Enrichment</span>
+            <span id="analyze-p2-pct">0%</span>
+          </div>
+          <div class="w-full bg-gray-800 rounded-full h-2">
+            <div id="analyze-p2-bar" class="progress-bar-fill bg-violet-500 h-2 rounded-full" style="width:0%"></div>
+          </div>
+        </div>
+        <div id="analyze-log"
+          class="log-area bg-gray-950 rounded-lg p-3 h-48 overflow-y-auto text-gray-400"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RESULTS TAB ── -->
+  <div id="tab-results" class="tab-content fade-in">
+    <h2 class="text-2xl font-semibold mb-6">Results</h2>
+
+    <div class="bg-gray-900 rounded-2xl ring-1 ring-white/10 p-6 mb-6">
+      <div class="flex flex-wrap gap-4 items-end mb-4">
+        <div class="flex-1 min-w-48">
+          <label class="block text-xs text-gray-400 mb-1">Local Collection</label>
+          <select id="results-collection"
+            class="w-full bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="">-- select --</option>
+          </select>
+        </div>
+        <button onclick="loadResults()"
+          class="btn-primary px-6 py-2 text-sm rounded-lg font-medium pb-2">Load</button>
+        <button onclick="loadLocalCollectionsForResults()"
+          class="px-4 py-2 text-sm rounded-lg font-medium bg-gray-800 hover:bg-gray-700 transition-colors pb-2">↻ Refresh</button>
+      </div>
+    </div>
+
+    <div id="results-table-wrap" class="hidden overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-xs text-gray-400 border-b border-white/10">
+            <th class="pb-3 pr-4 font-medium" style="width:176px">Media</th>
+            <th class="pb-3 pr-4 font-medium">Post</th>
+            <th class="pb-3 pr-4 font-medium">Locations</th>
+            <th class="pb-3 font-medium">Status</th>
+          </tr>
+        </thead>
+        <tbody id="results-tbody"></tbody>
+      </table>
+    </div>
+    <p id="results-empty" class="hidden text-gray-500 text-sm mt-4">No results to display.</p>
+  </div>
+
+</main>
+
+<style>
+  .btn-primary {
+    background: linear-gradient(135deg, #6366f1, #7c3aed);
+    color: white;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-primary:active { transform: scale(0.97); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .tab-btn { color: #9ca3af; }
+  .tab-btn.active { background: #312e81; color: #a5b4fc; }
+  .tab-btn:hover:not(.active) { background: #1f2937; color: #e5e7eb; }
+</style>
+
+<script>
+  // ── State ──
+  let currentTab = 'collect';
+  let pendingTwofaToken = null;
+
+  // ── Tab switching ──
+  function switchTab(name) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    document.getElementById('tab-btn-' + name).classList.add('active');
+    currentTab = name;
+  }
+
+  // ── Init ──
+  async function init() {
+    await checkAuthStatus();
+    await Promise.all([
+      loadInstagramCollections(),
+      loadLocalCollections(),
+      loadLocalCollectionsForResults(),
+    ]);
+  }
+
+  // ── Auth status ──
+  async function checkAuthStatus() {
+    try {
+      const r = await fetch('/api/auth/status');
+      const d = await r.json();
+      setStatusBadge('status-instagram', d.instagram);
+      setStatusBadge('status-gemini', d.gemini_key);
+      setStatusBadge('status-maps', d.maps_key);
+
+      if (!d.instagram || !d.gemini_key || !d.maps_key) {
+        switchTab('setup');
+      } else {
+        switchTab('collect');
+      }
+    } catch(e) {
+      console.error('Auth status error:', e);
+      switchTab('setup');
+    }
+  }
+
+  function setStatusBadge(id, ok) {
+    const el = document.getElementById(id);
+    el.textContent = ok ? '✓' : '✗';
+    el.className = 'font-semibold ' + (ok ? 'text-green-400' : 'text-red-400');
+  }
+
+  // ── Instagram login ──
+  async function doInstagramLogin() {
+    const username = document.getElementById('ig-username').value.trim();
+    const password = document.getElementById('ig-password').value;
+    const msg = document.getElementById('login-msg');
+    if (!username || !password) { msg.textContent = 'Enter username and password.'; msg.className = 'text-sm text-yellow-400'; return; }
+    msg.textContent = 'Logging in...'; msg.className = 'text-sm text-gray-400';
+    try {
+      const r = await fetch('/api/auth/instagram/login', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username, password}),
+      });
+      const d = await r.json();
+      if (d.status === 'ok') {
+        msg.textContent = 'Logged in!'; msg.className = 'text-sm text-green-400';
+        await checkAuthStatus();
+      } else if (d.status === '2fa_required') {
+        pendingTwofaToken = d.token;
+        document.getElementById('login-form').classList.add('hidden');
+        document.getElementById('twofa-form').classList.remove('hidden');
+        msg.textContent = '';
+      } else {
+        msg.textContent = d.message || 'Login failed.'; msg.className = 'text-sm text-red-400';
+      }
+    } catch(e) {
+      msg.textContent = 'Network error.'; msg.className = 'text-sm text-red-400';
+    }
+  }
+
+  async function doInstagram2FA() {
+    const code = document.getElementById('twofa-code').value.trim();
+    const msg = document.getElementById('twofa-msg');
+    if (!code) { msg.textContent = 'Enter 2FA code.'; msg.className = 'text-sm text-yellow-400'; return; }
+    msg.textContent = 'Verifying...'; msg.className = 'text-sm text-gray-400';
+    try {
+      const r = await fetch('/api/auth/instagram/2fa', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({token: pendingTwofaToken, code}),
+      });
+      const d = await r.json();
+      if (d.status === 'ok') {
+        msg.textContent = 'Verified!'; msg.className = 'text-sm text-green-400';
+        document.getElementById('twofa-form').classList.add('hidden');
+        document.getElementById('login-form').classList.remove('hidden');
+        pendingTwofaToken = null;
+        await checkAuthStatus();
+      } else {
+        msg.textContent = d.message || 'Verification failed.'; msg.className = 'text-sm text-red-400';
+      }
+    } catch(e) {
+      msg.textContent = 'Network error.'; msg.className = 'text-sm text-red-400';
+    }
+  }
+
+  async function doDeleteSession() {
+    const msg = document.getElementById('login-msg');
+    await fetch('/api/auth/instagram/session', {method: 'DELETE'});
+    msg.textContent = 'Session cleared.'; msg.className = 'text-sm text-yellow-400';
+    await checkAuthStatus();
+  }
+
+  // ── API keys ──
+  async function doSaveKeys() {
+    const gemini = document.getElementById('gemini-key').value.trim();
+    const maps = document.getElementById('maps-key').value.trim();
+    const msg = document.getElementById('keys-msg');
+    if (!gemini && !maps) { msg.textContent = 'Enter at least one key.'; msg.className = 'text-sm text-yellow-400'; return; }
+    msg.textContent = 'Saving...'; msg.className = 'text-sm text-gray-400';
+    try {
+      const r = await fetch('/api/auth/keys', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({gemini_api_key: gemini || null, google_places_api: maps || null}),
+      });
+      const d = await r.json();
+      if (d.status === 'ok') {
+        msg.textContent = 'Keys saved!'; msg.className = 'text-sm text-green-400';
+        await checkAuthStatus();
+      } else {
+        msg.textContent = 'Failed to save keys.'; msg.className = 'text-sm text-red-400';
+      }
+    } catch(e) {
+      msg.textContent = 'Network error.'; msg.className = 'text-sm text-red-400';
+    }
+  }
+
+  // ── Collections ──
+  async function loadInstagramCollections() {
+    const sel = document.getElementById('collect-collection');
+    sel.innerHTML = '<option value="">-- loading... --</option>';
+    try {
+      const r = await fetch('/api/collections/instagram');
+      if (!r.ok) { sel.innerHTML = '<option value="">-- not logged in --</option>'; return; }
+      const cols = await r.json();
+      sel.innerHTML = cols.length
+        ? cols.map(c => `<option value="${esc(c.id)}" data-name="${esc(c.name)}">${esc(c.name)}</option>`).join('')
+        : '<option value="">-- no collections --</option>';
+    } catch(e) {
+      sel.innerHTML = '<option value="">-- error --</option>';
+    }
+  }
+
+  async function loadLocalCollections() {
+    const sel = document.getElementById('analyze-collection');
+    sel.innerHTML = '<option value="">-- loading... --</option>';
+    try {
+      const r = await fetch('/api/collections/local');
+      const cols = await r.json();
+      sel.innerHTML = cols.length
+        ? cols.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('')
+        : '<option value="">-- no collections --</option>';
+    } catch(e) {
+      sel.innerHTML = '<option value="">-- error --</option>';
+    }
+  }
+
+  async function loadLocalCollectionsForResults() {
+    const sel = document.getElementById('results-collection');
+    try {
+      const r = await fetch('/api/collections/local');
+      const cols = await r.json();
+      sel.innerHTML = cols.length
+        ? '<option value="">-- select --</option>' + cols.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('')
+        : '<option value="">-- no collections --</option>';
+    } catch(e) {
+      sel.innerHTML = '<option value="">-- error --</option>';
+    }
+  }
+
+  // ── Collect ──
+  async function startCollect() {
+    const sel = document.getElementById('collect-collection');
+    const collectionId = sel.value;
+    const collectionName = sel.options[sel.selectedIndex]?.dataset?.name || sel.options[sel.selectedIndex]?.text || collectionId;
+    const skipDownload = document.getElementById('collect-skip').checked;
+    if (!collectionId) { alert('Select a collection first.'); return; }
+
+    const btn = document.getElementById('collect-btn');
+    btn.disabled = true;
+
+    const wrap = document.getElementById('collect-progress-wrap');
+    wrap.classList.remove('hidden');
+    const log = document.getElementById('collect-log');
+    log.textContent = '';
+    setProgress('collect-progress-bar', 'collect-progress-pct', 0);
+
+    const r = await fetch('/api/jobs/collect', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({collection_id: collectionId, collection_name: collectionName, skip_download: skipDownload}),
+    });
+    const {job_id} = await r.json();
+
+    const es = new EventSource(`/api/jobs/${job_id}/stream`);
+    es.onmessage = (e) => {
+      const ev = JSON.parse(e.data);
+      setProgress('collect-progress-bar', 'collect-progress-pct', ev.pct);
+      document.getElementById('collect-progress-label').textContent = ev.message;
+      appendLog(log, ev.message, false);
+    };
+    es.addEventListener('done', (e) => {
+      es.close();
+      const d = JSON.parse(e.data);
+      if (d.status === 'done') {
+        appendLog(log, `Done! Total items: ${d.result?.total_items ?? '?'}`, true);
+        setProgress('collect-progress-bar', 'collect-progress-pct', 100);
+        loadLocalCollections();
+        loadLocalCollectionsForResults();
+      } else {
+        appendLog(log, `Error: ${d.error}`, false, true);
+      }
+      btn.disabled = false;
+    });
+    es.onerror = () => {
+      es.close();
+      appendLog(log, 'Connection error.', false, true);
+      btn.disabled = false;
+    };
+  }
+
+  // ── Analyze ──
+  async function startAnalyze() {
+    const collectionName = document.getElementById('analyze-collection').value;
+    if (!collectionName) { alert('Select a collection first.'); return; }
+
+    const btn = document.getElementById('analyze-btn');
+    btn.disabled = true;
+
+    const wrap = document.getElementById('analyze-progress-wrap');
+    wrap.classList.remove('hidden');
+    const log = document.getElementById('analyze-log');
+    log.textContent = '';
+    setProgress('analyze-p1-bar', 'analyze-p1-pct', 0);
+    setProgress('analyze-p2-bar', 'analyze-p2-pct', 0);
+
+    const r = await fetch('/api/jobs/analyze', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({collection_name: collectionName}),
+    });
+    const {job_id} = await r.json();
+
+    const es = new EventSource(`/api/jobs/${job_id}/stream`);
+    es.onmessage = (e) => {
+      const ev = JSON.parse(e.data);
+      if (ev.phase === 'analyze') {
+        setProgress('analyze-p1-bar', 'analyze-p1-pct', ev.pct);
+      } else if (ev.phase === 'enrich') {
+        setProgress('analyze-p2-bar', 'analyze-p2-pct', ev.pct);
+      }
+      appendLog(log, `[${ev.phase}] ${ev.message}`, false);
+    };
+    es.addEventListener('done', (e) => {
+      es.close();
+      const d = JSON.parse(e.data);
+      if (d.status === 'done') {
+        const res = d.result;
+        appendLog(log, `Done! Items: ${res?.total_items}, AI errors: ${res?.analysis_errors}, Enriched: ${res?.enrichment_success}, Enrich errors: ${res?.enrichment_errors}`, true);
+        setProgress('analyze-p1-bar', 'analyze-p1-pct', 100);
+        setProgress('analyze-p2-bar', 'analyze-p2-pct', 100);
+        loadLocalCollectionsForResults();
+      } else {
+        appendLog(log, `Error: ${d.error}`, false, true);
+      }
+      btn.disabled = false;
+    });
+    es.onerror = () => {
+      es.close();
+      appendLog(log, 'Connection error.', false, true);
+      btn.disabled = false;
+    };
+  }
+
+  // ── Results ──
+  async function loadResults() {
+    const collectionName = document.getElementById('results-collection').value;
+    if (!collectionName) { alert('Select a collection first.'); return; }
+
+    const r = await fetch(`/api/results/${encodeURIComponent(collectionName)}`);
+    if (!r.ok) { alert('Failed to load results.'); return; }
+    const items = await r.json();
+
+    const wrap = document.getElementById('results-table-wrap');
+    const empty = document.getElementById('results-empty');
+    const tbody = document.getElementById('results-tbody');
+    tbody.innerHTML = '';
+
+    if (!items.length) {
+      wrap.classList.add('hidden');
+      empty.classList.remove('hidden');
+      return;
+    }
+    empty.classList.add('hidden');
+    wrap.classList.remove('hidden');
+
+    items.forEach((item, idx) => {
+      const tr = document.createElement('tr');
+      tr.className = (idx % 2 === 0 ? 'bg-gray-900/50' : 'bg-gray-900/20') + ' border-b border-white/5';
+
+      // Media cell
+      const mediaPath = item.relative_path;
+      let mediaCellHtml = '<span class="text-gray-600 text-xs">No media</span>';
+      if (mediaPath) {
+        const url = `/media/${encodeURIComponent(collectionName)}/${encodeURIComponent(mediaPath)}`;
+        if (item.media_type === 2 || (item.media_type === 8 && mediaPath)) {
+          // Video or carousel (we try to show first file)
+          mediaCellHtml = `
+            <div style="position:relative;width:160px;display:inline-block;flex-shrink:0">
+              <video src="${url}" style="width:100%;border-radius:0.5rem;background:#111827;display:block" controls muted preload="metadata"
+                onplay="this.nextElementSibling.style.opacity='0'"
+                onpause="this.nextElementSibling.style.opacity='1'"></video>
+              <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:1;transition:opacity 0.2s">
+                <div style="width:44px;height:44px;background:rgba(0,0,0,0.55);border-radius:50%;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>
+                </div>
+              </div>
+            </div>`;
+        } else {
+          mediaCellHtml = `<img src="${url}" loading="lazy" alt="media" style="width:160px;border-radius:0.5rem;display:block" />`;
+        }
+      }
+
+      // Locations cell
+      const analysis = item.caption_analysis || {};
+      const enrichments = item.google_maps_enrichment || [];
+      let locationHtml = '';
+      if (analysis.location_found && enrichments.length) {
+        locationHtml = enrichments.map(e => {
+          const name = e.google_maps_data?.name || e.original_name;
+          const mapsUrl = e.google_maps_data?.google_maps_uri;
+          return mapsUrl
+            ? `<a href="${mapsUrl}" target="_blank" rel="noopener" class="text-indigo-400 hover:underline block">${esc(name)}</a>`
+            : `<span class="text-gray-400 block">${esc(name)}</span>`;
+        }).join('');
+      } else if (analysis.location_found && (analysis.locations || []).length) {
+        locationHtml = (analysis.locations || []).map(l => `<span class="text-gray-400 block">${esc(l)}</span>`).join('');
+      }
+
+      // Status badge
+      let badge = '';
+      if (analysis.error && !analysis.location_found) {
+        badge = '<span class="px-2 py-0.5 rounded-full text-xs bg-red-900/50 text-red-300">error</span>';
+      } else if (analysis.location_found) {
+        badge = '<span class="px-2 py-0.5 rounded-full text-xs bg-green-900/50 text-green-300">found</span>';
+      } else {
+        badge = '<span class="px-2 py-0.5 rounded-full text-xs bg-gray-800 text-gray-400">no location</span>';
+      }
+
+      tr.innerHTML = `
+        <td class="py-3 pr-4 align-top">${mediaCellHtml}</td>
+        <td class="py-3 pr-4 align-top">
+          <a href="${esc(item.url || '#')}" target="_blank" rel="noopener"
+            class="text-indigo-400 hover:underline text-xs">Open Post ↗</a>
+        </td>
+        <td class="py-3 pr-4 align-top text-xs">${locationHtml || '<span class="text-gray-600">—</span>'}</td>
+        <td class="py-3 align-top">${badge}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // ── Helpers ──
+  function esc(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function setProgress(barId, pctId, pct) {
+    document.getElementById(barId).style.width = pct + '%';
+    document.getElementById(pctId).textContent = pct + '%';
+  }
+
+  function appendLog(logEl, message, success = false, error = false) {
+    const line = document.createElement('div');
+    line.textContent = message;
+    if (error) line.className = 'text-red-400';
+    else if (success) line.className = 'text-green-400';
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  // ── Bootstrap ──
+  window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
