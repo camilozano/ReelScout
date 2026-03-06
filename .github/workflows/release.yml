@@ -5,8 +5,11 @@ name: Build Python Package
 
 on:
   push:
+    branches:
+      - '**'
     tags:
       - 'v*.*.*' # Trigger on version tags like v1.0.0, v0.1.2, etc.
+  pull_request:
 
 jobs:
   build:
