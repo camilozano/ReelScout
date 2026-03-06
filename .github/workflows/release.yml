@@ -34,5 +34,5 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: python-package-${{ github.ref_name }} # Include tag name in artifact name
+          name: python-package-${{ matrix.os }}-${{ github.run_id }}
           path: dist/
