@@ -1,91 +1,83 @@
 # System Patterns: ReelScout
 
-*(This document outlines the high-level architecture, key technical decisions, design patterns, and component relationships.)*
+*(This document outlines the current architecture, key technical decisions, and component relationships.)*
 
-**Current Architecture:**
+## Current Architecture
 
 ```mermaid
 graph TD
-    subgraph User_Interaction["User Interaction"]
-        A["CLI (reel-scout)"]
-    end
+    U["User"]
+    CLI["CLI (reel-scout)"]
+    WEB["FastAPI App"]
+    PIPE["Pipeline Layer (src/pipeline.py)"]
+    IG["Instagram Client"]
+    DL["Downloader"]
+    AI["AI Analyzer"]
+    MAPS["Location Enricher"]
+    META["downloads/{collection}/metadata.json"]
+    MEDIA["downloads/{collection}/media"]
+    ENV["auth/.env"]
+    SESSION["auth/session.json"]
+    INSTAGRAM["Instagram"]
+    GEMINI["Gemini API"]
+    GMAPS["Google Maps API"]
 
-    subgraph Core_Modules["Core Modules"]
-        B["Instagram Client (src/instagram_client.py)"]
-        C["Downloader (src/downloader.py)"]
-        D["AI Analyzer (src/ai_analyzer.py)"]
-        LE["Location Enricher (src/location_enricher.py)"]
-        E["Output Handler (TBD - currently handled in CLI)"]
-    end
-
-    subgraph Data["Data"]
-        F["auth/session.json"]
-        G["auth/.env"]
-        H["downloads/{collection_name}/metadata.json"]
-        I["downloads/{collection_name}/{video_files}"]
-        J["Analysis Results (e.g., CSV, updated JSON)"]
-    end
-
-    subgraph External_Services["External Services"]
-        K["Instagram (via instagrapi)"]
-        L["Google Gemini API (via google-generativeai)"]
-        GMaps["Google Maps API (via googlemaps)"]
-    end
-
-    A --> B
-    A --> C
-    A --> D
-    A --> LE
-    A --> E
-
-    B -->|Reads| F
-    B -->|Interacts| K
-    B -->|Collection/Media Info| A
-
-    C -->|Reads| H
-    C -->|Writes| I
-    C -->|Video Path/Metadata| A
-
-    D -->|Reads| G
-    D -->|Reads Caption| A
-    D -->|"Reads Video (Future)"| I
-    D -->|Interacts| L
-    D -->|Analysis| A
-
-    LE -->|Reads| G
-    LE -->|Interacts| GMaps
-    LE -->|Enrichment Data| A
-
-    A -->|Updates| H
-    E -->|Writes| J
+    U --> CLI
+    U --> WEB
+    CLI --> PIPE
+    WEB --> PIPE
+    PIPE --> IG
+    PIPE --> DL
+    PIPE --> AI
+    PIPE --> MAPS
+    IG --> SESSION
+    IG --> INSTAGRAM
+    DL --> META
+    DL --> MEDIA
+    AI --> ENV
+    AI --> GEMINI
+    MAPS --> ENV
+    MAPS --> GMAPS
+    PIPE --> META
 ```
 
-**Key Technical Decisions:**
+## Key Patterns
+*   **Pipeline orchestration:** `src/pipeline.py` contains the main collect and analyze flows used by the backend and partly mirrored by the CLI.
+*   **Modular boundaries:** Instagram access, downloading, AI analysis, and location enrichment are kept in separate modules.
+*   **File-based state:** media and metadata are stored on disk; job state for the web app is stored in memory.
+*   **Threaded background jobs:** the FastAPI app uses daemon threads for collect/analyze jobs because the downstream libraries are synchronous/blocking.
+*   **Structured AI output:** Gemini caption analysis uses JSON output validated with Pydantic.
 
-*   **Instagram Library:** `instagrapi` (Chosen, implemented in `src/instagram_client.py`).
-*   **Google Maps Library:** `googlemaps` (Chosen, implemented in `src/location_enricher.py`).
-*   **CLI Framework:** `click` (Chosen, implemented in `reel_scout_cli.py`).
-*   **Dependency Management:** `uv` for dependency resolution/runtime commands and `hatchling` for package builds.
-*   **Path Handling:** `pathlib` (Chosen).
-*   **Configuration:** Session via `auth/session.json`, API Keys (`GEMINI_API_KEY`, `GOOGLE_PLACES_API`) via `auth/.env` (using `python-dotenv`).
-*   **Video Handling:** Videos are downloaded locally first (`src/downloader.py`).
-    *   **Gemini Model (Text):** `models/gemini-2.0-flash-exp` (Updated 01 Apr 2025 from `models/gemini-1.5-pro-latest` per user request; originally fixed from `gemini-pro` 404 error).
-    *   **Gemini Model (Video):** TBD (e.g., `gemini-pro-vision`, `gemini-1.5-flash`).
-    *   **Programming Language:** Python 3.
-*   **Data Flow:** Primarily direct function calls between modules orchestrated by the CLI (`reel_scout_cli.py`). Metadata (`metadata.json`) is read, updated with AI analysis results, then updated again with Google Maps enrichment data within the `analyze` command.
+## Current Design Decisions
+*   **Single-user backend model:** the backend and CLI currently use one session file at `auth/session.json`.
+*   **Downloads layout:** current code writes into `downloads/{collection}/`.
+*   **Dependency/runtime tooling:** `uv`.
+*   **Package build backend:** `hatchling`.
+*   **CLI framework:** `click`.
+*   **Web framework:** `fastapi`.
+*   **Instagram library:** `instagrapi`.
+*   **Gemini library:** `google-genai`.
+*   **Maps library:** `googlemaps`.
 
-**Design Patterns:**
+## Component Relationships
+*   `reel_scout_cli.py`
+    *   exposes `collect`, `analyze`, `serve`
+    *   directly uses `InstagramClient`, `download_collection_media`, and `run_analyze_pipeline`
+*   `src/pipeline.py`
+    *   runs the tested collect/analyze workflows
+    *   is the main orchestration layer for background jobs in the API
+*   `src/api/app.py`
+    *   serves the frontend
+    *   exposes auth, collection, job, and result routes
+    *   uses in-memory job tracking and SSE for progress updates
+*   `src/downloader.py`
+    *   downloads videos, photos, and carousel resources
+    *   writes/updates `metadata.json`
+*   `src/ai_analyzer.py`
+    *   performs caption-based location extraction
+    *   does not yet implement the planned video-analysis fallback
+*   `src/location_enricher.py`
+    *   converts extracted location names into Google Maps place details
 
-*   **Modular Design:** Separate modules for distinct concerns (Instagram client, downloader, AI analyzer).
-*   **Configuration Management:** Loading sensitive data (API keys) from environment variables via `.env`.
-
-**Component Relationships:**
-
-*   `reel_scout_cli.py`: Orchestrates the workflow, handles user input, and calls other modules.
-*   `src/instagram_client.py`: Handles authentication and interaction with the Instagram API via `instagrapi`. Fetches collection and media data.
-*   `src/downloader.py`: Downloads media files (videos, photos, carousel resources) and saves initial metadata to `metadata.json`. Handles different media types: downloads videos/photos directly, downloads carousel resources into PK-named subdirectories. Checks for existing files/subdirs/resources to ensure idempotency.
-*   `src/ai_analyzer.py`: Handles interaction with the Google Gemini API. Contains function for text analysis (`analyze_caption_for_location`) and planned video analysis.
-*   `src/location_enricher.py`: Handles interaction with the Google Maps Places API via `googlemaps`. Contains function `enrich_location_data` to find place details based on a name.
-*   `Output Handler` (TBD): Currently, the final output (updated `metadata.json`) is handled directly within the `analyze` command in `reel_scout_cli.py`. A separate handler might be created later for different output formats (e.g., CSV).
-
-*(This document will be updated as the architecture evolves and further decisions are made.)*
+## Known Architectural Mismatch
+The frontend currently contains multi-user assumptions, but the backend and CLI are single-user. Until that mismatch is resolved, treat the backend and CLI as the canonical implementation and the frontend as partially ahead of the server contract.
