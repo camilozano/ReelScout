@@ -65,7 +65,7 @@ graph TD
 *   **Instagram Library:** `instagrapi` (Chosen, implemented in `src/instagram_client.py`).
 *   **Google Maps Library:** `googlemaps` (Chosen, implemented in `src/location_enricher.py`).
 *   **CLI Framework:** `click` (Chosen, implemented in `reel_scout_cli.py`).
-*   **Dependency Management:** `Poetry` (Chosen).
+*   **Dependency Management:** `uv` for dependency resolution/runtime commands and `hatchling` for package builds.
 *   **Path Handling:** `pathlib` (Chosen).
 *   **Configuration:** Session via `auth/session.json`, API Keys (`GEMINI_API_KEY`, `GOOGLE_PLACES_API`) via `auth/.env` (using `python-dotenv`).
 *   **Video Handling:** Videos are downloaded locally first (`src/downloader.py`).

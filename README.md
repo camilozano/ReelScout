@@ -42,7 +42,7 @@ Instagram Collection
 
 | Layer | Technology |
 |---|---|
-| Language | Python 3.11 + Poetry |
+| Language | Python 3.11 + uv |
 | Instagram | `instagrapi` 2.3 (unofficial API) |
 | AI | Google Gemini Flash (`google-genai`) |
 | Maps | Google Maps Places API (`googlemaps`) |
@@ -58,7 +58,7 @@ Instagram Collection
 ### Prerequisites
 
 - Python 3.11+
-- [Poetry](https://python-poetry.org/)
+- [uv](https://docs.astral.sh/uv/)
 - A [Google Gemini API key](https://aistudio.google.com/)
 - A [Google Maps Places API key](https://console.cloud.google.com/)
 - An Instagram account with saved collections
@@ -68,7 +68,7 @@ Instagram Collection
 ```bash
 git clone https://github.com/you/ReelScout.git
 cd ReelScout
-poetry install
+uv sync --group dev
 ```
 
 ### Configure
@@ -83,7 +83,7 @@ GOOGLE_PLACES_API=AIza...
 ### Run the Web UI
 
 ```bash
-poetry run reel-scout serve --port 8001
+uv run reel-scout serve --port 8001
 ```
 
 Open [http://localhost:8001](http://localhost:8001) and follow the four tabs:
@@ -99,13 +99,18 @@ Open [http://localhost:8001](http://localhost:8001) and follow the four tabs:
 
 ```bash
 # Download a collection interactively
-poetry run reel-scout collect --user yourhandle
+uv run reel-scout collect
 
 # Run analysis on a downloaded collection
-poetry run reel-scout analyze --user yourhandle
+uv run reel-scout analyze --collection-name "My Collection"
+```
 
-# Migrate sessions from single-user to multi-user layout
-poetry run reel-scout migrate
+### Build and install the CLI package
+
+```bash
+uv build
+python3 -m pip install dist/reel_scout-0.1.0-py3-none-any.whl
+reel-scout --help
 ```
 
 ---

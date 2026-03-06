@@ -19,7 +19,7 @@ A tool to collect Instagram Reels from saved collections, analyze them with Gemi
 - `tests/` — pytest unit tests for all modules
 
 ## Tech Stack
-- Python 3.11 (system), Poetry 2.3.2 — run via `/home/camilozano/.local/bin/poetry`
+- Python 3.11+ with `uv` for environment management and `hatchling` for builds
 - `instagrapi` 2.3.0 — unofficial Instagram API
 - `google-genai` (NOT `google-generativeai`) — Gemini API client
 - `googlemaps` — Google Maps Places API
@@ -30,9 +30,8 @@ A tool to collect Instagram Reels from saved collections, analyze them with Gemi
 
 ## Environment (this machine)
 - OS: Debian 12 (Bookworm) on Synology NAS
-- Poetry: `/home/camilozano/.local/bin/poetry`
-- Run CLI: `poetry run reel-scout collect` from `/volume2/nixhome/code/ReelScout`
-- Run web UI: `poetry run reel-scout serve --port 8001` (port 8000 is taken by Docker)
+- Run CLI: `uv run reel-scout collect` from `/volume2/nixhome/code/ReelScout`
+- Run web UI: `uv run reel-scout serve --port 8001` (port 8000 is taken by Docker)
 - Python 3.13 not available via apt — using 3.11, pyproject.toml set to `^3.11`
 
 ## Configuration
@@ -116,7 +115,7 @@ A tool to collect Instagram Reels from saved collections, analyze them with Gemi
 ## Testing
 - `tests/conftest.py` sets dummy env vars (`GEMINI_API_KEY`, `GOOGLE_PLACES_API`) at session scope to prevent import-time errors
 - All tests use mocks (no live API calls in unit tests)
-- Run: `poetry run pytest` — 63 tests, all passing
+- Run: `uv run pytest` — unit tests use mocks and should pass without live API calls
 
 ## Known Constraints
 - `instagrapi` uses unofficial Instagram API — can break with Instagram changes

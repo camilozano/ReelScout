@@ -15,7 +15,7 @@
 **Development Setup:**
 
 *   **Environment:** Local development environment (macOS).
-*   **Dependencies (Managed by Poetry in `pyproject.toml`):**
+*   **Dependencies (Managed by `uv` in `pyproject.toml`):**
     *   `google-genai`: For interacting with the Gemini API. **Updated (19 Apr 2025):** Replaced `google-generativeai`.
     *   `googlemaps`: For interacting with the Google Maps API.
     *   `instagrapi`: For interacting with Instagram.
@@ -39,7 +39,7 @@
 **Tool Usage Patterns:**
 
 *   **IDE:** VS Code.
-*   **Package Management:** `Poetry` (using `pyproject.toml`).
+*   **Package Management:** `uv` for locking/sync/runs, `hatchling` for builds.
 *   **Notebooks:** Jupyter Notebook (`3rdparty/gemini_video.ipynb`) used for initial exploration/prototyping with Gemini video capabilities.
 
 *(This document will be updated as specific libraries are chosen, versions are pinned, and the development environment evolves.)*
